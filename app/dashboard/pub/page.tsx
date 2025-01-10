@@ -1,6 +1,7 @@
 "use client";
 
 import "@/app/globals.css";
+import { Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import { toast } from "sonner";
@@ -320,8 +321,12 @@ export default function PubPage() {
       // Extraire les parties de la position
       const [prefix, group, number] = image.position.split("-");
 
-      // Construire le chemin de l'image dans Storage
-      const imagePath = `pub_images/${image.country}/week${image.weekNumber}/${number}/week-${image.weekNumber}-${image.position}.jpg`;
+      // Construire le chemin de l'image dans Storage pour tout type d'extension
+      const imagePath = `pub_images/${image.country}/week${
+        image.weekNumber
+      }/${number}/week-${image.weekNumber}-${image.position}.${image.imageUrl
+        .split(".")
+        .pop()}`;
 
       // Afficher toutes les informations pertinentes pour le debug
       console.log("Full image object:", image);
@@ -549,10 +554,10 @@ export default function PubPage() {
                   key={index}
                   className="p-4 transition-colors border rounded-lg hover:bg-accent"
                 >
-                  <div className="flex justify-between items-start w-full">
+                  <div className="flex items-start justify-between w-full">
                     <div className="flex flex-col items-center space-y-2">
                       <p className="text-lg font-bold text-card-foreground">
-                        {image.company_name} ({image.country})
+                        {image.company_name}
                       </p>
                       <div className="flex flex-col items-start space-y-1">
                         <p className="text-sm font-medium text-card-foreground">
@@ -571,9 +576,9 @@ export default function PubPage() {
                     </div>
                     <button
                       onClick={() => handleDelete(image)}
-                      className="p-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                      className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
                     >
-                      Delete
+                      <Trash2 />
                     </button>
                   </div>
                 </div>
