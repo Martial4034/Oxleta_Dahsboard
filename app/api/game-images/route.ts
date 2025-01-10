@@ -18,6 +18,19 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const weekNumber = searchParams.get("weekNumber");
+    const docId = searchParams.get("docId");
+
+    if (docId) {
+      const doc = await adminDb.collection("game-images").doc(docId).get();
+      console.log("Checking document:", docId, "Exists:", doc.exists);
+      if (!doc.exists) {
+        // Liste tous les documents pour debug
+        const snapshot = await adminDb.collection("game-images").get();
+        const allDocs = snapshot.docs.map((d) => d.id);
+        console.log("All document IDs:", allDocs);
+      }
+      return NextResponse.json({ exists: doc.exists });
+    }
 
     if (!weekNumber) {
       console.error("Week number is missing");
@@ -66,10 +79,9 @@ export async function GET(request: Request) {
       images,
     });
   } catch (error) {
-    console.error("Error fetching game images:", error);
+    console.error("Error in GET route:", error);
     return NextResponse.json(
       {
-        success: false,
         error: "Failed to fetch images",
       },
       { status: 500 }

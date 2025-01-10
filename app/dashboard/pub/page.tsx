@@ -312,6 +312,59 @@ export default function PubPage() {
     return matchesQuery && matchesCountry;
   });
 
+  const handleDelete = async (image: ImageData) => {
+    try {
+      // Construire le chemin du document Firestore avec le même format que handleSubmit
+      const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
+
+      // Extraire les parties de la position
+      const [prefix, group, number] = image.position.split("-");
+
+      // Construire le chemin de l'image dans Storage
+      const imagePath = `pub_images/${image.country}/week${image.weekNumber}/${number}/week-${image.weekNumber}-${image.position}.jpg`;
+
+      // Afficher toutes les informations pertinentes pour le debug
+      console.log("Full image object:", image);
+      console.log("Document ID being used:", docId);
+      console.log("Image path being used:", imagePath);
+
+      // Faire une requête GET préalable pour vérifier si le document existe
+      const checkResponse = await fetch(`/api/game-images?docId=${docId}`);
+      const checkData = await checkResponse.json();
+      console.log("Document check response:", checkData);
+
+      const response = await fetch("/api/game-images/delete", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          docId,
+          imagePath,
+        }),
+      });
+
+      const data = await response.json();
+      console.log("Delete response:", data);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete image");
+      }
+
+      // Rafraîchir la liste des images
+      if (selectedWeek) {
+        await fetchWeekImages(selectedWeek);
+      }
+
+      toast.success("Image deleted successfully!");
+    } catch (error) {
+      console.error("Error deleting image:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete image"
+      );
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
       <div className="p-4 mx-auto max-w-7xl md:p-8">
@@ -496,24 +549,32 @@ export default function PubPage() {
                   key={index}
                   className="p-4 transition-colors border rounded-lg hover:bg-accent"
                 >
-                  <div className="flex flex-col items-center space-y-2">
-                    <p className="text-lg font-bold text-card-foreground">
-                      {image.company_name} ({image.country})
-                    </p>
-                    <div className="flex flex-col items-start space-y-1">
-                      <p className="text-sm font-medium text-card-foreground">
-                        Offer Type: {image.offerType}
+                  <div className="flex justify-between items-start w-full">
+                    <div className="flex flex-col items-center space-y-2">
+                      <p className="text-lg font-bold text-card-foreground">
+                        {image.company_name} ({image.country})
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        Position: {image.position}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Week {image.weekNumber}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Country: {image.country}
-                      </p>
+                      <div className="flex flex-col items-start space-y-1">
+                        <p className="text-sm font-medium text-card-foreground">
+                          Offer Type: {image.offerType}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Position: {image.position}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Week {image.weekNumber}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Country: {image.country}
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => handleDelete(image)}
+                      className="p-2 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
