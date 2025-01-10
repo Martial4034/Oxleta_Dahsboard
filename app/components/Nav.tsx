@@ -23,7 +23,7 @@ export default function Nav() {
           <Menu className="w-6 h-6" />
         </button>
         {menuOpen && (
-          <div className="absolute right-0 w-48 mt-2 bg-white border rounded-lg shadow-lg">
+          <div className="absolute right-0 w-64 mt-2 bg-white border rounded-lg shadow-lg">
             <div className="p-4">
               {user ? (
                 <>

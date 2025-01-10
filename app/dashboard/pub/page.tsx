@@ -5,75 +5,14 @@ import { Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import { toast } from "sonner";
+import {
+  OfferType,
+  PositionCode,
+  POSITIONS,
+  POSITION_FORMATS,
+} from "../../components/pubInfo";
 
-type OfferType =
-  | "Premium 1"
-  | "Gold 1"
-  | "Gold 2"
-  | "Silver 1"
-  | "Silver 2"
-  | "Silver 3";
-type PositionCode =
-  | `P-1-1-${1 | 2 | 3 | 4 | 5 | 6}`
-  | `P-1-2-${1 | 2 | 3 | 4 | 5 | 6}`
-  | `G-1-1-${1 | 2 | 3}`
-  | `G-1-2-${1 | 2 | 3}`
-  | `G-2-1-${1 | 2 | 3}`
-  | `G-2-2-${1 | 2 | 3}`
-  | `S-1-1-${1 | 2 | 3 | 4}`
-  | `S-1-2-${1 | 2 | 3}`
-  | `S-2-1-${1 | 2 | 3 | 4}`
-  | `S-2-2-${1 | 2 | 3}`
-  | `S-3-1-${1 | 2 | 3 | 4}`
-  | `S-3-2-${1 | 2 | 3}`;
-
-const POSITIONS: Record<OfferType, PositionCode[]> = {
-  "Premium 1": [
-    "P-1-1-1",
-    "P-1-1-2",
-    "P-1-1-3",
-    "P-1-1-4",
-    "P-1-1-5",
-    "P-1-1-6",
-    "P-1-2-1",
-    "P-1-2-2",
-    "P-1-2-3",
-    "P-1-2-4",
-    "P-1-2-5",
-    "P-1-2-6",
-  ],
-  "Gold 1": ["G-1-1-1", "G-1-1-2", "G-1-1-3", "G-1-2-1", "G-1-2-2", "G-1-2-3"],
-  "Gold 2": ["G-2-1-1", "G-2-1-2", "G-2-1-3", "G-2-2-1", "G-2-2-2", "G-2-2-3"],
-  "Silver 1": [
-    "S-1-1-1",
-    "S-1-1-2",
-    "S-1-1-3",
-    "S-1-1-4",
-    "S-1-2-1",
-    "S-1-2-2",
-    "S-1-2-3",
-  ],
-  "Silver 2": [
-    "S-2-1-1",
-    "S-2-1-2",
-    "S-2-1-3",
-    "S-2-1-4",
-    "S-2-2-1",
-    "S-2-2-2",
-    "S-2-2-3",
-  ],
-  "Silver 3": [
-    "S-3-1-1",
-    "S-3-1-2",
-    "S-3-1-3",
-    "S-3-1-4",
-    "S-3-2-1",
-    "S-3-2-2",
-    "S-3-2-3",
-  ],
-} as const;
-
-interface ImageData {
+export interface ImageData {
   id: string;
   imageUrl: string;
   offerType: OfferType;
@@ -83,6 +22,7 @@ interface ImageData {
   selectedFile?: File;
   company_name: string;
   country: string;
+  format: string;
 }
 
 export default function PubPage() {
@@ -98,6 +38,7 @@ export default function PubPage() {
     weekNumber: 0,
     company_name: "",
     country: "FR",
+    format: POSITION_FORMATS["P-1-1-1"],
   });
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -240,6 +181,7 @@ export default function PubPage() {
         weekNumber: selectedWeek || 0,
         company_name: "",
         country: "FR",
+        format: POSITION_FORMATS["P-1-1-1"],
       });
 
       toast.success("Image saved successfully!");
@@ -251,34 +193,9 @@ export default function PubPage() {
         setProgress(100);
         setTimeout(() => {
           setIsUploading(false);
-          setProgress(0);
         }, 500);
-      }, 1000);
+      }, 500);
     }
-  };
-
-  const tileClassName = ({ date, view }: { date: Date; view: string }) => {
-    if (view === "month" && selectedWeek) {
-      const currentDate = new Date(date);
-      const selectedDate = new Date();
-      selectedDate.setDate(
-        selectedDate.getDate() +
-          (selectedWeek - getWeekNumber(selectedDate)) * 7
-      );
-
-      const { monday, sunday } = getWeekDates(selectedDate);
-
-      // Vérifier si la date est dans la semaine sélectionnée
-      const isInSelectedWeek = currentDate >= monday && currentDate <= sunday;
-
-      return `
-        hover:bg-accent hover:text-accent-foreground
-        focus:bg-accent focus:text-accent-foreground
-        ${isInSelectedWeek ? "bg-primary text-primary-foreground" : ""}
-        ${date.getDay() === 0 || date.getDay() === 6 ? "text-destructive" : ""}
-      `.trim();
-    }
-    return "";
   };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -370,6 +287,48 @@ export default function PubPage() {
     }
   };
 
+  const handlePositionChange = (position: PositionCode) => {
+    setImageData((prev) => ({
+      ...prev,
+      position,
+      format: POSITION_FORMATS[position],
+    }));
+  };
+
+  const handleOfferTypeChange = (newOfferType: OfferType) => {
+    const newPosition = POSITIONS[newOfferType][0];
+    setImageData((prev) => ({
+      ...prev,
+      offerType: newOfferType,
+      position: newPosition,
+      format: POSITION_FORMATS[newPosition],
+    }));
+  };
+
+  const tileClassName = ({ date, view }: { date: Date; view: string }) => {
+    if (view === "month" && selectedWeek) {
+      const currentDate = new Date(date);
+      const selectedDate = new Date();
+      selectedDate.setDate(
+        selectedDate.getDate() +
+          (selectedWeek - getWeekNumber(selectedDate)) * 7
+      );
+
+      const { monday, sunday } = getWeekDates(selectedDate);
+
+      // Vérifier si la date est dans la semaine sélectionnée
+      const isInSelectedWeek = currentDate >= monday && currentDate <= sunday;
+
+      return `
+        hover:bg-accent hover:text-accent-foreground
+        focus:bg-accent focus:text-accent-foreground
+        ${isInSelectedWeek ? "bg-primary text-primary-foreground" : ""}
+        ${date.getDay() === 0 || date.getDay() === 6 ? "text-destructive" : ""}
+      `.trim();
+    }
+    return "";
+  };
+
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
       <div className="p-4 mx-auto max-w-7xl md:p-8">
@@ -415,18 +374,18 @@ export default function PubPage() {
                     <input
                       type="text"
                       value={imageData.company_name}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const value = e.target.value.slice(0, 20);
                         setImageData({
                           ...imageData,
-                          company_name: e.target.value,
-                        })
-                      }
+                          company_name: value,
+                        });
+                      }}
                       className="block w-full pl-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
                       placeholder="Enter company name"
                       required
                     />
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground">
                       Country
@@ -447,71 +406,65 @@ export default function PubPage() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Offer Type
-                      </label>
-                      <select
-                        value={imageData.offerType}
-                        onChange={(e) => {
-                          const newOfferType = e.target.value as OfferType;
-                          setImageData({
-                            ...imageData,
-                            offerType: newOfferType,
-                            position: POSITIONS[newOfferType][0],
-                          });
-                        }}
-                        className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      >
-                        {Object.keys(POSITIONS).map((offer) => (
-                          <option key={offer} value={offer}>
-                            {offer}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground">
+                      Offer Type
+                    </label>
+                    <select
+                      value={imageData.offerType}
+                      onChange={(e) =>
+                        handleOfferTypeChange(e.target.value as OfferType)
+                      }
+                      className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                    >
+                      {Object.keys(POSITIONS).map((offer) => (
+                        <option key={offer} value={offer}>
+                          {offer}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Position
-                      </label>
-                      <select
-                        value={imageData.position}
-                        onChange={(e) =>
-                          setImageData({
-                            ...imageData,
-                            position: e.target.value as PositionCode,
-                          })
-                        }
-                        className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      >
-                        {POSITIONS[imageData.offerType].map((position) => (
-                          <option key={position} value={position}>
-                            {position}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground">
+                      Position
+                    </label>
+                    <select
+                      value={imageData.position}
+                      onChange={(e) =>
+                        handlePositionChange(e.target.value as PositionCode)
+                      }
+                      className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                    >
+                      {POSITIONS[imageData.offerType].map((position) => (
+                        <option key={position} value={position}>
+                          {position}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="h-3"></div> {/* Spacer of 16px */}
+                    <p className="text-sm text-muted-foreground">
+                      Format: {imageData.format}
+                    </p>
+                  </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Upload Image
-                      </label>
-                      <div className="mt-1">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileUpload}
-                          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-primary-foreground hover:file:bg-primary/90"
-                          disabled={isUploading}
-                        />
-                        {isUploading && (
-                          <div className="mt-2 text-sm text-muted-foreground">
-                            Uploading...
-                          </div>
-                        )}
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground">
+                      Upload Image
+                    </label>
+                    <div className="mt-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-primary-foreground hover:file:bg-primary/90"
+                        disabled={isUploading}
+                      />
+                      {isUploading && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          Uploading...
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -556,7 +509,7 @@ export default function PubPage() {
                 >
                   <div className="flex items-start justify-between w-full">
                     <div className="flex flex-col items-center space-y-2">
-                      <p className="text-lg font-bold text-card-foreground">
+                      <p className="text-lg font-bold text-center text-card-foreground">
                         {image.company_name}
                       </p>
                       <div className="flex flex-col items-start space-y-1">
@@ -567,6 +520,9 @@ export default function PubPage() {
                           Position: {image.position}
                         </p>
                         <p className="text-sm text-muted-foreground">
+                          Format: {image.format}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           Week {image.weekNumber}
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -574,12 +530,14 @@ export default function PubPage() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDelete(image)}
-                      className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 />
-                    </button>
+                    <div className="flex items-end justify-end h-full">
+                      <button
+                        onClick={() => handleDelete(image)}
+                        className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
