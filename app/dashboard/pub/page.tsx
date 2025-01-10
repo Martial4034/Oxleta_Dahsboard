@@ -101,6 +101,7 @@ export default function PubPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [progress, setProgress] = useState(0);
+  const [selectedCountry, setSelectedCountry] = useState<string>("");
 
   useEffect(() => {
     if (selectedWeek) {
@@ -159,7 +160,8 @@ export default function PubPage() {
 
   const handleDateSelect = (date: Date) => {
     const weekNum = getWeekNumber(date);
-    setSelectedWeek(weekNum);
+    const { monday } = getWeekDates(date);
+    setSelectedWeek(getWeekNumber(monday));
     setShowForm(true);
     setImageData((prev) => ({ ...prev, weekNumber: weekNum }));
   };
@@ -297,12 +299,17 @@ export default function PubPage() {
 
   const filteredImages = weekImages.filter((image) => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesQuery =
       image.company_name.toLowerCase().includes(query) ||
       image.offerType.toLowerCase().includes(query) ||
       image.position.toLowerCase().includes(query) ||
-      image.country.toLowerCase().includes(query)
-    );
+      image.country.toLowerCase().includes(query);
+
+    const matchesCountry = selectedCountry
+      ? image.country === selectedCountry
+      : true;
+
+    return matchesQuery && matchesCountry;
   });
 
   return (
@@ -310,6 +317,11 @@ export default function PubPage() {
       <div className="p-4 mx-auto max-w-7xl md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Pub Management</h1>
+          <h2 className="p-2 text-lg font-semibold text-card-foreground">
+            {selectedWeek
+              ? `Images for Week ${selectedWeek}`
+              : "Select a week to view images"}
+          </h2>
         </div>
 
         <div className="grid grid-cols-1 gap-8 pb-8 lg:grid-cols-2">
@@ -324,6 +336,10 @@ export default function PubPage() {
                   onChange={(value: any) => handleDateSelect(value as Date)}
                   className="w-full border-none rounded-lg bg-card text-card-foreground"
                   tileClassName={tileClassName}
+                  calendarType="iso8601"
+                  tileDisabled={({ date, view }) =>
+                    view === "month" && date.getDay() === 0
+                  }
                 />
               </div>
             </div>
@@ -373,26 +389,6 @@ export default function PubPage() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Upload Image
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-primary-foreground hover:file:bg-primary/90"
-                        disabled={isUploading}
-                      />
-                      {isUploading && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Uploading...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-muted-foreground">
@@ -439,6 +435,26 @@ export default function PubPage() {
                         ))}
                       </select>
                     </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Upload Image
+                      </label>
+                      <div className="mt-1">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-primary-foreground hover:file:bg-primary/90"
+                          disabled={isUploading}
+                        />
+                        {isUploading && (
+                          <div className="mt-2 text-sm text-muted-foreground">
+                            Uploading...
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <button
@@ -455,11 +471,6 @@ export default function PubPage() {
           {/* Colonne de droite : Liste des images */}
           <div className="p-6 border shadow-sm bg-card rounded-xl flex flex-col h-[calc(130vh-160px)]">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-card-foreground">
-                {selectedWeek
-                  ? `Images for Week ${selectedWeek}`
-                  : "Select a week to view images"}
-              </h2>
               <input
                 type="text"
                 value={searchQuery}
@@ -467,6 +478,16 @@ export default function PubPage() {
                 placeholder="Search..."
                 className="px-2 py-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
               />
+              <select
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+                className="px-2 py-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+              >
+                <option value="">All Countries</option>
+                <option value="FR">France</option>
+                <option value="ESP">Spain</option>
+                <option value="RU">Russia</option>
+              </select>
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto">
