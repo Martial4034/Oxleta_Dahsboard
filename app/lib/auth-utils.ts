@@ -1,4 +1,4 @@
-import { jwtVerify } from "jose";
+import { jwtVerify, JWTPayload } from "jose";
 
 const FIREBASE_PROJECT_ID = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
@@ -22,7 +22,7 @@ export async function verifyAuth(token: string) {
     }
 
     const publicKeys = await response.json();
-    let payload = null;
+    let payload: JWTPayload | null = null;
 
     // Try each public key until one works
     for (const keyId in publicKeys) {
@@ -42,6 +42,7 @@ export async function verifyAuth(token: string) {
         payload = result.payload;
         break;
       } catch (e) {
+        console.error("Error verifying token:", e);
         console.log("Failed with key:", keyId, "trying next key...");
         continue;
       }

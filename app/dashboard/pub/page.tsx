@@ -236,7 +236,7 @@ export default function PubPage() {
       const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
 
       // Extraire les parties de la position
-      const [prefix, group, number] = image.position.split("-");
+      const [number] = image.position.split("-");
 
       // Construire le chemin de l'image dans Storage pour tout type d'extension
       const imagePath = `pub_images/${image.country}/week${

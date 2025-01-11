@@ -9,7 +9,7 @@ const HomePage = () => {
         </h1>
         <p className="mt-4 text-lg text-center text-gray-600">
           Ce tableau de bord permet de gérer efficacement les publicités en
-          fonction des pays, des offres disponibles et des périodes d'affichage.
+          fonction des pays, des offres disponibles et des périodes d&apos;affichage.
         </p>
       </header>
 
@@ -29,7 +29,7 @@ const HomePage = () => {
             </li>
             <li className="flex items-center">
               <Calendar className="w-5 h-5 mr-2 text-purple-500" />
-              Planification et gestion des périodes d'affichage.
+              Planification et gestion des périodes d&apos;affichage.
             </li>
           </ul>
         </section>

@@ -54,6 +54,7 @@ const SettingsPage = () => {
         setNewPassword("");
         setConfirmPassword("");
       } catch (error) {
+        console.error("Error updating password:", error);
         setHasError("L'ancien mot de passe est incorrect.");
       } finally {
         setIsLoading(false);
