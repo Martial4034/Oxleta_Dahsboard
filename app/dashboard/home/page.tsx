@@ -36,7 +36,7 @@ const HomePage = () => {
 
         <section className="mb-6">
           <h2 className="mb-4 text-2xl font-semibold text-gray-700">
-            Pourquoi utiliser ce dashboard ?
+            Pourquoi utiliser ce dashboard ??
           </h2>
           <p className="text-gray-600">
             Notre dashboard offre une interface intuitive pour suivre vos
