@@ -562,15 +562,6 @@ export default function PubPage() {
                           <p className="text-sm text-muted-foreground">
                             Format: {image.format}
                           </p>
-                          <button
-                            onClick={() => {
-                              setSelectedFormat(image.format);
-                              setIsFormatModalOpen(true);
-                            }}
-                            className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200"
-                          >
-                            See format
-                          </button>
                         </div>
                         <p className="text-sm text-muted-foreground">
                           Week {image.weekNumber}
