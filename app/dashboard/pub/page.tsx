@@ -7,9 +7,9 @@ import Calendar from "react-calendar";
 import { toast } from "sonner";
 import {
   OfferType,
+  POSITION_FORMATS,
   PositionCode,
   POSITIONS,
-  POSITION_FORMATS,
 } from "../../components/pubInfo";
 
 export interface ImageData {
@@ -44,12 +44,42 @@ export default function PubPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [progress, setProgress] = useState(0);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
+  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+
+  const getCurrentWeek = () => {
+    const today = new Date();
+    const { monday } = getWeekDates(today);
+    return getWeekNumber(monday);
+  };
+
+  useEffect(() => {
+    const currentWeek = getCurrentWeek();
+    setSelectedWeek(currentWeek);
+    setImageData((prev) => ({
+      ...prev,
+      weekNumber: currentWeek,
+    }));
+  }, []);
 
   useEffect(() => {
     if (selectedWeek) {
       fetchWeekImages(selectedWeek);
     }
   }, [selectedWeek]);
+
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsFormatModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleEsc);
+
+    return () => {
+      window.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
 
   const fetchWeekImages = async (weekNum: number) => {
     try {
@@ -232,25 +262,20 @@ export default function PubPage() {
 
   const handleDelete = async (image: ImageData) => {
     try {
-      // Construire le chemin du document Firestore avec le même format que handleSubmit
       const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
 
-      // Extraire les parties de la position
-      const [number] = image.position.split("-");
+      const positionNumber = image.position.split("-")[2];
 
-      // Construire le chemin de l'image dans Storage pour tout type d'extension
       const imagePath = `pub_images/${image.country}/week${
         image.weekNumber
-      }/${number}/week-${image.weekNumber}-${image.position}.${image.imageUrl
-        .split(".")
-        .pop()}`;
+      }/${positionNumber}/week-${image.weekNumber}-${
+        image.position
+      }.${image.imageUrl.split(".").pop()}`;
 
-      // Afficher toutes les informations pertinentes pour le debug
       console.log("Full image object:", image);
       console.log("Document ID being used:", docId);
       console.log("Image path being used:", imagePath);
 
-      // Faire une requête GET préalable pour vérifier si le document existe
       const checkResponse = await fetch(`/api/game-images?docId=${docId}`);
       const checkData = await checkResponse.json();
       console.log("Document check response:", checkData);
@@ -273,7 +298,6 @@ export default function PubPage() {
         throw new Error(data.error || "Failed to delete image");
       }
 
-      // Rafraîchir la liste des images
       if (selectedWeek) {
         await fetchWeekImages(selectedWeek);
       }
@@ -337,7 +361,7 @@ export default function PubPage() {
           <h2 className="p-2 text-lg font-semibold text-card-foreground">
             {selectedWeek
               ? `Images for Week ${selectedWeek}`
-              : "Select a week to view images"}
+              : "Loading current week..."}
           </h2>
         </div>
 
@@ -443,9 +467,23 @@ export default function PubPage() {
                       ))}
                     </select>
                     <div className="h-3"></div> {/* Spacer of 16px */}
-                    <p className="text-sm text-muted-foreground">
-                      Format: {imageData.format}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between w-full">
+                        <p className="text-sm text-muted-foreground">
+                          Format: {imageData.format}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFormat(imageData.format);
+                            setIsFormatModalOpen(true);
+                          }}
+                          className="block px-3 py-2 mt-2 text-sm font-semibold bg-blue-600 rounded-md text-primary-foreground hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                        >
+                          See format
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -454,6 +492,7 @@ export default function PubPage() {
                     </label>
                     <div className="mt-1">
                       <input
+                        alt="Upload Image"
                         type="file"
                         accept="image/*"
                         onChange={handleFileUpload}
@@ -519,9 +558,20 @@ export default function PubPage() {
                         <p className="text-sm text-muted-foreground">
                           Position: {image.position}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          Format: {image.format}
-                        </p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            Format: {image.format}
+                          </p>
+                          <button
+                            onClick={() => {
+                              setSelectedFormat(image.format);
+                              setIsFormatModalOpen(true);
+                            }}
+                            className="px-2 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200"
+                          >
+                            See format
+                          </button>
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           Week {image.weekNumber}
                         </p>
@@ -560,6 +610,25 @@ export default function PubPage() {
         </div>
       )}
       <div className="h-8"></div> {/* Spacer of 32px */}
+      {isFormatModalOpen && selectedFormat && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative max-w-4xl p-4 bg-white rounded-lg">
+            <button
+              onClick={() => setIsFormatModalOpen(false)}
+              className="absolute p-2 text-gray-500 hover:text-gray-700 top-2 right-2"
+            >
+              ✕
+            </button>
+            <div className="mt-8">
+              <img
+                src={`/images/Format-pub.png`}
+                alt={`Format ${selectedFormat}`}
+                className="max-h-[80vh] w-auto"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
