@@ -3,6 +3,7 @@
 import { auth } from "@/app/firebase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { authorizedEmails } from "@/lib/authorized-emails";
 import { FirebaseError } from "firebase/app";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useRouter } from "next/navigation";
@@ -19,6 +20,13 @@ export const SignIn = () => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    // Vérifier si l'email est autorisé
+    if (!authorizedEmails.includes(email.toLowerCase())) {
+      setError("This email is not authorized to access this application.");
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -53,7 +61,6 @@ export const SignIn = () => {
       // Force a hard navigation to ensure middleware runs
       window.location.href = "/dashboard/home";
     } catch (error) {
-      // Type guard to ensure error is FirebaseError
       if (error instanceof FirebaseError) {
         switch (error.code) {
           case "auth/invalid-credential":
@@ -100,7 +107,7 @@ export const SignIn = () => {
             required
           />
         </div>
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+        {error && <p className="text-sm text-red-500">{error}</p>}
         <Button type="submit" className="w-full" disabled={isLoading}>
           {isLoading ? "Signing in..." : "Sign In"}
         </Button>
