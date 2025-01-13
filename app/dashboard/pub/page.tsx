@@ -1,9 +1,11 @@
 "use client";
 
+import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
 import { Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
+import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
 import {
   OfferType,
@@ -26,6 +28,7 @@ export interface ImageData {
 }
 
 export default function PubPage() {
+  const [user] = useAuthState(auth);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [weekImages, setWeekImages] = useState<ImageData[]>([]);
@@ -199,6 +202,21 @@ export default function PubPage() {
 
       if (!saveResponse.ok) throw new Error("Failed to save image");
 
+      const timestamp = new Date().toLocaleString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      console.log(`✅ Image ajoutée par ${user?.email} le ${timestamp}`);
+      console.log(`📁 Emplacement: ${imagePath}`);
+      console.log(
+        `📊 Détails: Semaine ${imageData.weekNumber}, Position ${imageData.position}, Pays ${imageData.country}`
+      );
+
       if (selectedWeek) {
         await fetchWeekImages(selectedWeek);
       }
@@ -216,7 +234,7 @@ export default function PubPage() {
 
       toast.success("Image saved successfully!");
     } catch (error) {
-      console.error("Error saving image data:", error);
+      console.error("❌ Erreur lors de l'ajout de l'image:", error);
       toast.error("Error saving image data. Please try again.");
     } finally {
       setTimeout(() => {
@@ -298,13 +316,28 @@ export default function PubPage() {
         throw new Error(data.error || "Failed to delete image");
       }
 
+      const timestamp = new Date().toLocaleString("fr-FR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      });
+
+      console.log(`🗑️ Image supprimée par ${user?.email} le ${timestamp}`);
+      console.log(`📁 Emplacement: ${imagePath}`);
+      console.log(
+        `📊 Détails: Semaine ${image.weekNumber}, Position ${image.position}, Pays ${image.country}`
+      );
+
       if (selectedWeek) {
         await fetchWeekImages(selectedWeek);
       }
 
       toast.success("Image deleted successfully!");
     } catch (error) {
-      console.error("Error deleting image:", error);
+      console.error("❌ Erreur lors de la suppression de l'image:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to delete image"
       );
