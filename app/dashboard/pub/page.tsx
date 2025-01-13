@@ -17,6 +17,7 @@ import {
 export interface ImageData {
   id: string;
   imageUrl: string;
+  publicUrl: string;
   offerType: OfferType;
   position: PositionCode;
   weekNumber: number;
@@ -36,6 +37,7 @@ export default function PubPage() {
     Omit<ImageData, "id" | "createdAt">
   >({
     imageUrl: "",
+    publicUrl: "", // Added missing property
     offerType: "Premium 1",
     position: "P-1-1-1",
     weekNumber: 0,
@@ -140,9 +142,14 @@ export default function PubPage() {
     setShowForm(true);
     setImageData((prev) => ({ ...prev, weekNumber: weekNum }));
   };
+  const bucketName =
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    "your-project-id.appspot.com";
 
   const generatePublicUrl = (bucketName: string, imagePath: string): string => {
-    return `https://storage.googleapis.com/${bucketName}/${imagePath}`;
+    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(
+      imagePath
+    )}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -179,10 +186,10 @@ export default function PubPage() {
         throw new Error(uploadData.error || "Upload failed");
       }
 
-      const bucketName = "flappyoxo.appspot.com";
       const positionNumber = imageData.position.split("-")[2];
       const imagePath = `pub_images/${imageData.country}/week${imageData.weekNumber}/${positionNumber}/${customFileName}`;
       const imageUrl = generatePublicUrl(bucketName, imagePath);
+      const publicUrl = `https://storage.googleapis.com/${bucketName}/${imagePath}`;
 
       const customDocId = `week-${imageData.weekNumber}-${imageData.position}-${imageData.country}`;
 
@@ -196,6 +203,7 @@ export default function PubPage() {
           imageData: {
             ...imageData,
             imageUrl,
+            publicUrl,
           },
         }),
       });
@@ -222,7 +230,8 @@ export default function PubPage() {
       }
 
       setShowForm(false);
-      setImageData({
+      setImageData((prev) => ({
+        ...prev,
         imageUrl: "",
         offerType: "Premium 1",
         position: "P-1-1-1",
@@ -230,7 +239,7 @@ export default function PubPage() {
         company_name: "",
         country: "FR",
         format: POSITION_FORMATS["P-1-1-1"],
-      });
+      }));
 
       toast.success("Image saved successfully!");
     } catch (error) {
@@ -579,32 +588,50 @@ export default function PubPage() {
                   key={index}
                   className="p-4 transition-colors border rounded-lg hover:bg-accent"
                 >
-                  <div className="flex items-start justify-between w-full">
-                    <div className="flex flex-col items-center space-y-2">
-                      <p className="text-lg font-bold text-center text-card-foreground">
-                        {image.company_name}
-                      </p>
-                      <div className="flex flex-col items-start space-y-1">
-                        <p className="text-sm font-medium text-card-foreground">
-                          Offer Type: {image.offerType}
+                  <div className="flex items-start justify-between w-full gap-4">
+                    <div className="flex flex-col flex-1">
+                      <div className="flex flex-col items-start space-y-2">
+                        <p className="text-lg font-bold text-card-foreground">
+                          {image.company_name}
                         </p>
-                        <p className="text-sm text-muted-foreground">
-                          Position: {image.position}
-                        </p>
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col items-start space-y-1">
+                          <p className="text-sm font-medium text-card-foreground">
+                            Offer Type: {image.offerType}
+                          </p>
                           <p className="text-sm text-muted-foreground">
-                            Format: {image.format}
+                            Position: {image.position}
+                          </p>
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm text-muted-foreground">
+                              Format: {image.format}
+                            </p>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            Week {image.weekNumber}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Country: {image.country}
                           </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          Week {image.weekNumber}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Country: {image.country}
-                        </p>
                       </div>
                     </div>
-                    <div className="flex items-end justify-end h-full">
+
+                    <div className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg">
+                      <a
+                        href={image.publicUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full h-full transition-transform hover:scale-105"
+                      >
+                        <img
+                          src={image.publicUrl}
+                          alt={`${image.company_name} - ${image.position}`}
+                          className="object-cover w-full h-full"
+                        />
+                      </a>
+                    </div>
+
+                    <div className="flex items-start">
                       <button
                         onClick={() => handleDelete(image)}
                         className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
