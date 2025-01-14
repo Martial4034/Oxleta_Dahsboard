@@ -506,51 +506,32 @@ export default function PubPage() {
                       <option value="RU">Russia</option>
                     </select>
                   </div>
-                  <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setIsOfferTypeModalOpen(true)}
-                      className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                    >
-                      See Offer type
-                    </button>
-                  </div>
-                  {isOfferTypeModalOpen && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                      <div className="relative max-w-4xl p-4 bg-white rounded-lg">
-                        <button
-                          onClick={() => setIsOfferTypeModalOpen(false)}
-                          className="absolute p-2 text-gray-500 hover:text-gray-700 top-2 right-2"
-                        >
-                          ✕
-                        </button>
-                        <div className="mt-8">
-                          <img
-                            src="/images/page-pub.jpg"
-                            alt="Offer Type Layout"
-                            className="max-h-[80vh] w-auto"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground">
                       Offer Type
                     </label>
-                    <select
-                      value={imageData.offerType}
-                      onChange={(e) =>
-                        handleOfferTypeChange(e.target.value as OfferType)
-                      }
-                      className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                    >
-                      {Object.keys(POSITIONS).map((offer) => (
-                        <option key={offer} value={offer}>
-                          {offer}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-4 mt-1">
+                      <select
+                        value={imageData.offerType}
+                        onChange={(e) =>
+                          handleOfferTypeChange(e.target.value as OfferType)
+                        }
+                        className="flex-1 block w-full border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                      >
+                        {Object.keys(POSITIONS).map((offer) => (
+                          <option key={offer} value={offer}>
+                            {offer}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setIsOfferTypeModalOpen(true)}
+                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        See Offer type
+                      </button>
+                    </div>
                   </div>
 
                   <div>
@@ -570,23 +551,26 @@ export default function PubPage() {
                         </option>
                       ))}
                     </select>
-                    <div className="h-3"></div> {/* Spacer of 16px */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-between w-full">
-                        <p className="text-sm text-muted-foreground">
-                          Format: {imageData.format}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedFormat(imageData.format);
-                            setIsFormatModalOpen(true);
-                          }}
-                          className="block px-3 py-2 mt-2 text-sm font-semibold bg-blue-600 rounded-md text-primary-foreground hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                        >
-                          See format
-                        </button>
-                      </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-muted-foreground">
+                      Format :
+                    </label>
+                    <div className="flex items-center gap-4 mt-1">
+                      <p className="flex-1 px-3 py-2 text-sm text-muted-foreground">
+                        {imageData.format}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFormat(imageData.format);
+                          setIsFormatModalOpen(true);
+                        }}
+                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        See format
+                      </button>
                     </div>
                   </div>
 
@@ -736,6 +720,26 @@ export default function PubPage() {
               <img
                 src="/images/Format-pub.png"
                 alt={`Format ${selectedFormat}`}
+                className="max-h-[80vh] w-auto"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal pour See Offer type */}
+      {isOfferTypeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="relative max-w-4xl p-4 bg-white rounded-lg">
+            <button
+              onClick={() => setIsOfferTypeModalOpen(false)}
+              className="absolute p-2 text-gray-500 hover:text-gray-700 top-2 right-2"
+            >
+              ✕
+            </button>
+            <div className="mt-8">
+              <img
+                src="/images/page-pub.jpg"
+                alt="Offer Type Layout"
                 className="max-h-[80vh] w-auto"
               />
             </div>
