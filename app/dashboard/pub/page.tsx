@@ -524,13 +524,6 @@ export default function PubPage() {
                           </option>
                         ))}
                       </select>
-                      <button
-                        type="button"
-                        onClick={() => setIsOfferTypeModalOpen(true)}
-                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        See Offer type
-                      </button>
                     </div>
                   </div>
 
@@ -538,19 +531,28 @@ export default function PubPage() {
                     <label className="block text-sm font-medium text-muted-foreground">
                       Position
                     </label>
-                    <select
-                      value={imageData.position}
-                      onChange={(e) =>
-                        handlePositionChange(e.target.value as PositionCode)
-                      }
-                      className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                    >
-                      {POSITIONS[imageData.offerType].map((position) => (
-                        <option key={position} value={position}>
-                          {position}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-4 mt-1">
+                      <select
+                        value={imageData.position}
+                        onChange={(e) =>
+                          handlePositionChange(e.target.value as PositionCode)
+                        }
+                        className="flex-1 block w-full border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                      >
+                        {POSITIONS[imageData.offerType].map((position) => (
+                          <option key={position} value={position}>
+                            {position}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setIsOfferTypeModalOpen(true)}
+                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      >
+                        See Position
+                      </button>
+                    </div>
                   </div>
 
                   <div>
