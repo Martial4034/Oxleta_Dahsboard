@@ -1,5 +1,5 @@
-import { ProtectedRoute } from "@/app/components/auth/protected-route";
-import DashboardNav from "@/app/components/DashboardNav";
+import { ProtectedRoute } from "@/app/api/components/auth/protected-route";
+import DashboardNav from "@/app/api/components/DashboardNav";
 import { ReactNode } from "react";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

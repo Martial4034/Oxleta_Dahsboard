@@ -2,6 +2,7 @@
 
 import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
+import imageCompression from "browser-image-compression";
 import { Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
@@ -12,7 +13,7 @@ import {
   POSITION_FORMATS,
   PositionCode,
   POSITIONS,
-} from "../../components/pubInfo";
+} from "../../api/components/pubInfo";
 
 export interface ImageData {
   id: string;
@@ -51,6 +52,7 @@ export default function PubPage() {
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [isOfferTypeModalOpen, setIsOfferTypeModalOpen] = useState(false);
 
   const getCurrentWeek = () => {
     const today = new Date();
@@ -77,6 +79,7 @@ export default function PubPage() {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsFormatModalOpen(false);
+        setIsOfferTypeModalOpen(false);
       }
     };
     window.addEventListener("keydown", handleEsc);
@@ -152,6 +155,54 @@ export default function PubPage() {
     )}`;
   };
 
+  const compressImage = async (file: File) => {
+    const options = {
+      maxSizeMB: 1, // Taille maximale en MB
+      maxWidthOrHeight: 1920, // Dimension maximale
+      useWebWorker: true, // Utilise un Web Worker pour ne pas bloquer le thread principal
+      fileType: "image/jpeg", // Format de sortie
+    };
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      console.log("Taille originale:", file.size / 1024 / 1024, "MB");
+      console.log(
+        "Taille compressée:",
+        compressedFile.size / 1024 / 1024,
+        "MB"
+      );
+      return compressedFile;
+    } catch (error) {
+      console.error("Erreur lors de la compression:", error);
+      return file; // Retourne le fichier original en cas d'erreur
+    }
+  };
+
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    try {
+      const compressedFile = await compressImage(file);
+      setImageData((prev) => ({
+        ...prev,
+        selectedFile: compressedFile,
+      }));
+
+      toast.success(
+        "Image selected and compressed. Click 'Save Image' to upload."
+      );
+    } catch (error) {
+      console.error("Error handling file:", error);
+      toast.error("Error processing image. Please try again.");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -168,8 +219,9 @@ export default function PubPage() {
       const fileExtension = imageData.selectedFile.name.split(".").pop();
       const customFileName = `week-${imageData.weekNumber}-${imageData.position}.${fileExtension}`;
 
+      // Pas besoin de recompresser ici car déjà fait dans handleFileUpload
       const renamedFile = new File([imageData.selectedFile], customFileName, {
-        type: imageData.selectedFile.type,
+        type: "image/jpeg", // Force JPEG pour une meilleure compression
       });
 
       formData.append("file", renamedFile);
@@ -253,23 +305,6 @@ export default function PubPage() {
         }, 500);
       }, 500);
     }
-  };
-
-  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please select an image file");
-      return;
-    }
-
-    setImageData((prev) => ({
-      ...prev,
-      selectedFile: file,
-    }));
-
-    toast.success("Image selected. Click 'Save Image' to upload.");
   };
 
   const filteredImages = weekImages.filter((image) => {
@@ -471,7 +506,34 @@ export default function PubPage() {
                       <option value="RU">Russia</option>
                     </select>
                   </div>
-
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsOfferTypeModalOpen(true)}
+                      className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      See Offer type
+                    </button>
+                  </div>
+                  {isOfferTypeModalOpen && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                      <div className="relative max-w-4xl p-4 bg-white rounded-lg">
+                        <button
+                          onClick={() => setIsOfferTypeModalOpen(false)}
+                          className="absolute p-2 text-gray-500 hover:text-gray-700 top-2 right-2"
+                        >
+                          ✕
+                        </button>
+                        <div className="mt-8">
+                          <img
+                            src="/images/page-pub.jpg"
+                            alt="Offer Type Layout"
+                            className="max-h-[80vh] w-auto"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-muted-foreground">
                       Offer Type
@@ -672,7 +734,7 @@ export default function PubPage() {
             </button>
             <div className="mt-8">
               <img
-                src={`/images/Format-pub.png`}
+                src="/images/Format-pub.png"
                 alt={`Format ${selectedFormat}`}
                 className="max-h-[80vh] w-auto"
               />
