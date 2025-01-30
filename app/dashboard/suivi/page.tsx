@@ -199,9 +199,9 @@ export default function SuiviPage() {
                   className="px-2 py-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
                 >
                   <option value="">All Countries</option>
-                  <option value="FR">France</option>
+                  {/* <option value="FR">France</option>
                   <option value="ESP">Spain</option>
-                  <option value="RU">Russia</option>
+                  <option value="RU">Russia</option> */}
                 </select>
               </div>
 

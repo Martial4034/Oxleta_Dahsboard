@@ -17,40 +17,33 @@ export async function POST(request: Request) {
 
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
-      const filePath = `client/${clientName}/${format}/${file.name}`;
+      const fileExtension = file.name.split(".").pop();
+      const filePath = `client/${clientName}/${format}/${format}.${fileExtension}`;
 
-      const bucketName = process.env.FIREBASE_STORAGE_BUCKET;
+      const bucket = adminStorage.bucket(process.env.FIREBASE_STORAGE_BUCKET);
 
-      if (!bucketName) {
-        console.error("Storage bucket name not specified");
-        return NextResponse.json(
-          { error: "Storage bucket name not specified" },
-          { status: 500 }
-        );
-      }
-
-      const bucket = adminStorage.bucket(bucketName);
-
-      if (!bucket) {
-        console.error("Could not get storage bucket");
-        return NextResponse.json(
-          { error: "Could not get storage bucket" },
-          { status: 500 }
-        );
+      // Supprimer l'ancienne image si elle existe
+      try {
+        const [files] = await bucket.getFiles({
+          prefix: `client/${clientName}/${format}/`,
+        });
+        await Promise.all(files.map((file) => file.delete()));
+      } catch (error) {
+        console.log("No existing file to delete or error:", error);
       }
 
       const fileRef = bucket.file(filePath);
-
       await fileRef.save(buffer, {
         metadata: {
           contentType: file.type,
         },
       });
 
-      // Make the file publicly accessible
       await fileRef.makePublic();
 
-      // Update Firestore document
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
+
+      // Mettre à jour Firestore
       const clientsRef = adminDb.collection("clients");
       const clientSnapshot = await clientsRef
         .where("name", "==", clientName)
@@ -67,8 +60,6 @@ export async function POST(request: Request) {
       await clientDoc.ref.update({
         [`formats.${format}`]: true,
       });
-
-      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${filePath}`;
 
       return NextResponse.json({
         success: true,

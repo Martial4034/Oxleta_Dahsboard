@@ -41,6 +41,14 @@ export default function ClientPage() {
     clientId: string;
     format: ImageFormat;
   } | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [replaceConfirmation, setReplaceConfirmation] = useState<{
+    isOpen: boolean;
+    client: ClientData;
+    format: ImageFormat;
+    file: File;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -83,48 +91,6 @@ export default function ClientPage() {
     }
   };
 
-  const handleImageUpload = async (
-    client: ClientData,
-    format: ImageFormat,
-    file: File
-  ) => {
-    try {
-      setIsUploading(true);
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("clientName", client.name);
-      formData.append("format", format);
-
-      console.log("Uploading file:", {
-        clientName: client.name,
-        format,
-        fileName: file.name,
-      });
-
-      const response = await fetch("/api/upload_client", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error("Upload error:", data);
-        throw new Error(data.error || "Failed to upload image");
-      }
-
-      toast.success(`Image uploaded for format ${format}`);
-      await fetchClients();
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload image"
-      );
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const fetchClients = async () => {
     try {
       const response = await fetch("/api/clients");
@@ -159,20 +125,73 @@ export default function ClientPage() {
   const handleUploadConfirm = async () => {
     if (!selectedFile || !selectedClient || !selectedFormat) return;
 
-    try {
-      setUploadingFormat({
-        clientId: selectedClient.id,
+    if (selectedClient.formats[selectedFormat]) {
+      setReplaceConfirmation({
+        isOpen: true,
+        client: selectedClient,
         format: selectedFormat,
+        file: selectedFile,
       });
-      await handleImageUpload(selectedClient, selectedFormat, selectedFile);
+      return;
+    }
+
+    await uploadImage(selectedClient, selectedFormat, selectedFile);
+  };
+
+  const uploadImage = async (
+    client: ClientData,
+    format: ImageFormat,
+    file: File
+  ) => {
+    try {
+      setIsUploading(true);
+      setProgress(0);
+      setUploadingFormat({
+        clientId: client.id,
+        format: format,
+      });
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("clientName", client.name);
+      formData.append("format", format);
+
+      const xhr = new XMLHttpRequest();
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = (event.loaded / event.total) * 100;
+          setProgress(percentComplete);
+        }
+      };
+
+      await new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve(xhr.response);
+          } else {
+            reject(new Error("Upload failed"));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Upload failed"));
+
+        xhr.open("POST", "/api/upload_client");
+        xhr.send(formData);
+      });
+
+      toast.success(`Image uploaded for format ${format}`);
+      await fetchClients();
       setIsUploadModalOpen(false);
       setSelectedFile(null);
       setSelectedFormat(null);
       setSelectedClient(null);
+      setReplaceConfirmation(null);
     } catch (error) {
       console.error("Error during upload:", error);
+      toast.error("Failed to upload image");
     } finally {
+      setIsUploading(false);
       setUploadingFormat(null);
+      setProgress(0);
     }
   };
 
@@ -183,8 +202,27 @@ export default function ClientPage() {
   const confirmDelete = async () => {
     if (!deleteConfirmation) return;
 
+    let progressInterval: NodeJS.Timeout | undefined = undefined;
+
     try {
       setDeletingClientId(deleteConfirmation.clientId);
+      setIsDeleting(true);
+      setProgress(0);
+
+      // Démarrer la progression simulée plus lentement
+      progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            if (progressInterval) clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 5; // Augmenter de 5% au lieu de 10%
+        });
+      }, 200);
+
+      // Attendre un peu avant de lancer la requête pour voir la progression
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
       const response = await fetch(
         `/api/delete-client?clientId=${deleteConfirmation.clientId}`,
         {
@@ -196,14 +234,23 @@ export default function ClientPage() {
         throw new Error("Failed to delete client");
       }
 
+      // Compléter la barre de progression
+      setProgress(100);
+      if (progressInterval) clearInterval(progressInterval);
+
       toast.success("Client deleted successfully");
       fetchClients();
     } catch (error) {
       console.error("Error deleting client:", error);
       toast.error("Failed to delete client");
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setDeletingClientId(null);
       setDeleteConfirmation(null);
+      setIsDeleting(false);
+      setProgress(0);
     }
   };
 
@@ -326,8 +373,17 @@ export default function ClientPage() {
                     accept="image/*"
                     onChange={handleFileSelect}
                     className="w-full mt-1 text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700"
+                    disabled={isUploading}
                   />
                 </div>
+                {isUploading && (
+                  <div className="w-full h-2 overflow-hidden bg-gray-200 rounded-full">
+                    <div
+                      className="h-full transition-all duration-300 bg-blue-600"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                )}
                 <div className="flex justify-end space-x-2">
                   <button
                     type="button"
@@ -336,15 +392,23 @@ export default function ClientPage() {
                       setSelectedFile(null);
                     }}
                     className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                    disabled={isUploading}
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleUploadConfirm}
                     disabled={!selectedFile || isUploading}
-                    className="px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
+                    className="relative px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
                   >
-                    Upload
+                    {isUploading ? (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Uploading...</span>
+                      </div>
+                    ) : (
+                      "Upload"
+                    )}
                   </button>
                 </div>
               </div>
@@ -399,18 +463,89 @@ export default function ClientPage() {
                 {deleteConfirmation.clientName} ? Cette action ne peut pas être
                 annulée et supprimera toutes les images associées.
               </p>
+              {isDeleting && (
+                <div className="w-full h-2 mb-4 overflow-hidden bg-gray-200 rounded-full">
+                  <div
+                    className="h-full transition-all duration-300 bg-red-600"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
               <div className="flex justify-end space-x-2">
                 <button
                   onClick={() => setDeleteConfirmation(null)}
                   className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                  disabled={isDeleting}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="px-4 py-2 text-white transition-colors bg-red-600 rounded-md hover:bg-red-700"
+                  className="relative px-4 py-2 text-white transition-colors bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                  disabled={isDeleting}
                 >
-                  Delete
+                  {isDeleting ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Deleting...</span>
+                    </div>
+                  ) : (
+                    "Delete"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {replaceConfirmation && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="p-6 bg-white rounded-lg w-96">
+              <h2 className="mb-4 text-xl font-semibold">
+                Replace Existing Image
+              </h2>
+              <p className="mb-6 text-gray-600">
+                An image already exists for the format{" "}
+                {replaceConfirmation.format}. Are you sure you want to replace
+                it?
+              </p>
+              {isUploading && (
+                <div className="w-full h-2 mb-4 overflow-hidden bg-gray-200 rounded-full">
+                  <div
+                    className="h-full transition-all duration-300 bg-blue-600"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
+              <div className="flex justify-end space-x-2">
+                <button
+                  onClick={() => setReplaceConfirmation(null)}
+                  className="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                  disabled={isUploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (replaceConfirmation) {
+                      uploadImage(
+                        replaceConfirmation.client,
+                        replaceConfirmation.format,
+                        replaceConfirmation.file
+                      );
+                    }
+                  }}
+                  className="relative px-4 py-2 text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Replacing...</span>
+                    </div>
+                  ) : (
+                    "Replace"
+                  )}
                 </button>
               </div>
             </div>

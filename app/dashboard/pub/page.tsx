@@ -3,7 +3,6 @@
 import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
 import imageCompression from "browser-image-compression";
-import { Trash2 } from "lucide-react";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -33,23 +32,20 @@ export default function PubPage() {
   const [user] = useAuthState(auth);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [weekImages, setWeekImages] = useState<ImageData[]>([]);
   const [imageData, setImageData] = useState<
     Omit<ImageData, "id" | "createdAt">
   >({
     imageUrl: "",
-    publicUrl: "", // Added missing property
+    publicUrl: "",
     offerType: "Premium 1",
     position: "P-1-1-1",
     weekNumber: 0,
     company_name: "",
-    country: "FR",
+    country: "ALL",
     format: POSITION_FORMATS["P-1-1-1"],
   });
   const [isUploading, setIsUploading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [progress, setProgress] = useState(0);
-  const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
   const [isOfferTypeModalOpen, setIsOfferTypeModalOpen] = useState(false);
@@ -70,12 +66,6 @@ export default function PubPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedWeek) {
-      fetchWeekImages(selectedWeek);
-    }
-  }, [selectedWeek]);
-
-  useEffect(() => {
     const handleEsc = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setIsFormatModalOpen(false);
@@ -88,36 +78,6 @@ export default function PubPage() {
       window.removeEventListener("keydown", handleEsc);
     };
   }, []);
-
-  const fetchWeekImages = async (weekNum: number) => {
-    try {
-      const response = await fetch(`/api/game-images?weekNumber=${weekNum}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch images: ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Received non-JSON response");
-      }
-
-      const data = await response.json();
-      console.log("Fetched images data:", data);
-      if (data.images) {
-        setWeekImages(
-          data.images.map((image: ImageData) => ({
-            ...image,
-            createdAt: new Date(image.createdAt),
-          }))
-        );
-      } else {
-        throw new Error("No images found");
-      }
-    } catch (error) {
-      console.error("Error fetching images:", error);
-      toast.error("Error loading images. Please try again.");
-    }
-  };
 
   const getWeekNumber = (date: Date): number => {
     const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
@@ -277,10 +237,6 @@ export default function PubPage() {
         `📊 Détails: Semaine ${imageData.weekNumber}, Position ${imageData.position}, Pays ${imageData.country}`
       );
 
-      if (selectedWeek) {
-        await fetchWeekImages(selectedWeek);
-      }
-
       setShowForm(false);
       setImageData((prev) => ({
         ...prev,
@@ -289,7 +245,7 @@ export default function PubPage() {
         position: "P-1-1-1",
         weekNumber: selectedWeek || 0,
         company_name: "",
-        country: "FR",
+        country: "ALL",
         format: POSITION_FORMATS["P-1-1-1"],
       }));
 
@@ -304,87 +260,6 @@ export default function PubPage() {
           setIsUploading(false);
         }, 500);
       }, 500);
-    }
-  };
-
-  const filteredImages = weekImages.filter((image) => {
-    const query = searchQuery.toLowerCase();
-    const matchesQuery =
-      image.company_name.toLowerCase().includes(query) ||
-      image.offerType.toLowerCase().includes(query) ||
-      image.position.toLowerCase().includes(query) ||
-      image.country.toLowerCase().includes(query);
-
-    const matchesCountry = selectedCountry
-      ? image.country === selectedCountry
-      : true;
-
-    return matchesQuery && matchesCountry;
-  });
-
-  const handleDelete = async (image: ImageData) => {
-    try {
-      const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
-
-      const positionNumber = image.position.split("-")[2];
-
-      const imagePath = `pub_images/${image.country}/week${
-        image.weekNumber
-      }/${positionNumber}/week-${image.weekNumber}-${
-        image.position
-      }.${image.imageUrl.split(".").pop()}`;
-
-      console.log("Full image object:", image);
-      console.log("Document ID being used:", docId);
-      console.log("Image path being used:", imagePath);
-
-      const checkResponse = await fetch(`/api/game-images?docId=${docId}`);
-      const checkData = await checkResponse.json();
-      console.log("Document check response:", checkData);
-
-      const response = await fetch("/api/game-images/delete", {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          docId,
-          imagePath,
-        }),
-      });
-
-      const data = await response.json();
-      console.log("Delete response:", data);
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to delete image");
-      }
-
-      const timestamp = new Date().toLocaleString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
-
-      console.log(`🗑️ Image supprimée par ${user?.email} le ${timestamp}`);
-      console.log(`📁 Emplacement: ${imagePath}`);
-      console.log(
-        `📊 Détails: Semaine ${image.weekNumber}, Position ${image.position}, Pays ${image.country}`
-      );
-
-      if (selectedWeek) {
-        await fetchWeekImages(selectedWeek);
-      }
-
-      toast.success("Image deleted successfully!");
-    } catch (error) {
-      console.error("❌ Erreur lors de la suppression de l'image:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to delete image"
-      );
     }
   };
 
@@ -432,7 +307,7 @@ export default function PubPage() {
 
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
-      <div className="p-4 mx-auto max-w-7xl md:p-8">
+      <div className="max-w-4xl p-4 mx-auto md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Pub Management</h1>
           <h2 className="p-2 text-lg font-semibold text-card-foreground">
@@ -442,273 +317,188 @@ export default function PubPage() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 pb-8 lg:grid-cols-2">
-          {/* Colonne de gauche : Calendrier et formulaire */}
-          <div className="space-y-6">
-            <div className="overflow-hidden border shadow-sm bg-card rounded-xl">
-              <div className="p-6">
-                <h2 className="mb-4 text-xl font-semibold text-card-foreground">
-                  Select Week
-                </h2>
-                <Calendar
-                  onChange={(value: any) => handleDateSelect(value as Date)}
-                  className="w-full border-none rounded-lg bg-card text-card-foreground"
-                  tileClassName={tileClassName}
-                  calendarType="iso8601"
-                  tileDisabled={({ date, view }) =>
-                    view === "month" && date.getDay() === 0
-                  }
-                />
-              </div>
+        <div className="space-y-6">
+          {/* Calendrier */}
+          <div className="overflow-hidden border shadow-sm bg-card rounded-xl">
+            <div className="p-6">
+              <h2 className="mb-4 text-xl font-semibold text-card-foreground">
+                Select Week
+              </h2>
+              <Calendar
+                onChange={(value: any) => handleDateSelect(value as Date)}
+                className="w-full border-none rounded-lg bg-card text-card-foreground"
+                tileClassName={tileClassName}
+                calendarType="iso8601"
+                tileDisabled={({ date, view }) =>
+                  view === "month" && date.getDay() === 0
+                }
+              />
             </div>
-
-            {showForm && (
-              <div className="p-6 border shadow-sm bg-card rounded-xl">
-                <h2 className="mb-4 text-xl font-semibold text-card-foreground">
-                  Add Image for Week {selectedWeek}
-                </h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Company Name
-                    </label>
-                    <input
-                      type="text"
-                      value={imageData.company_name}
-                      onChange={(e) => {
-                        const value = e.target.value.slice(0, 20);
-                        setImageData({
-                          ...imageData,
-                          company_name: value,
-                        });
-                      }}
-                      className="block w-full pl-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      placeholder="Enter company name"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Country
-                    </label>
-                    <select
-                      value={imageData.country}
-                      onChange={(e) =>
-                        setImageData({
-                          ...imageData,
-                          country: e.target.value,
-                        })
-                      }
-                      className="block w-full mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                    >
-                      <option value="FR">France</option>
-                      <option value="ESP">Spain</option>
-                      <option value="RU">Russia</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Offer Type
-                    </label>
-                    <div className="flex items-center gap-4 mt-1">
-                      <select
-                        value={imageData.offerType}
-                        onChange={(e) =>
-                          handleOfferTypeChange(e.target.value as OfferType)
-                        }
-                        className="flex-1 block w-full border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      >
-                        {Object.keys(POSITIONS).map((offer) => (
-                          <option key={offer} value={offer}>
-                            {offer}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Position
-                    </label>
-                    <div className="flex items-center gap-4 mt-1">
-                      <select
-                        value={imageData.position}
-                        onChange={(e) =>
-                          handlePositionChange(e.target.value as PositionCode)
-                        }
-                        className="flex-1 block w-full border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      >
-                        {POSITIONS[imageData.offerType].map((position) => (
-                          <option key={position} value={position}>
-                            {position}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={() => setIsOfferTypeModalOpen(true)}
-                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        See Position
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Format :
-                    </label>
-                    <div className="flex items-center gap-4 mt-1">
-                      <p className="flex-1 px-3 py-2 text-sm text-muted-foreground">
-                        {imageData.format}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedFormat(imageData.format);
-                          setIsFormatModalOpen(true);
-                        }}
-                        className="px-3 py-2 text-sm font-semibold text-white bg-blue-600 rounded-md whitespace-nowrap hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      >
-                        See format
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground">
-                      Upload Image
-                    </label>
-                    <div className="mt-1">
-                      <input
-                        alt="Upload Image"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileUpload}
-                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-primary-foreground hover:file:bg-primary/90"
-                        disabled={isUploading}
-                      />
-                      {isUploading && (
-                        <div className="mt-2 text-sm text-muted-foreground">
-                          Uploading...
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="w-full px-4 py-2 transition-colors rounded-md bg-primary text-primary-foreground hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    Save Image
-                  </button>
-                </form>
-              </div>
-            )}
           </div>
 
-          {/* Colonne de droite : Liste des images */}
-          <div className="p-6 border shadow-sm bg-card rounded-xl flex flex-col h-[calc(130vh-160px)]">
-            <div className="flex items-center justify-between mb-4">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="px-2 py-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-              />
-              <select
-                value={selectedCountry}
-                onChange={(e) => setSelectedCountry(e.target.value)}
-                className="px-2 py-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-              >
-                <option value="">All Countries</option>
-                <option value="FR">France</option>
-                <option value="ESP">Spain</option>
-                <option value="RU">Russia</option>
-              </select>
-            </div>
+          {/* Formulaire d'ajout d'image */}
+          {showForm && (
+            <div className="p-6 border shadow-sm bg-card rounded-xl">
+              <h2 className="mb-6 text-xl font-semibold text-card-foreground">
+                Add Image for Week {selectedWeek}
+              </h2>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {/* Company Name & Country */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Company Name
+                      </label>
+                      <input
+                        type="text"
+                        value={imageData.company_name}
+                        onChange={(e) => {
+                          const value = e.target.value.slice(0, 20);
+                          setImageData({
+                            ...imageData,
+                            company_name: value,
+                          });
+                        }}
+                        className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                        placeholder="Enter company name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Country
+                      </label>
+                      <select
+                        value={imageData.country}
+                        onChange={(e) =>
+                          setImageData({
+                            ...imageData,
+                            country: e.target.value,
+                          })
+                        }
+                        className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                      >
+                        <option value="ALL">All Countries</option>
+                        {/* <option value="FR">France</option>
+                        <option value="ESP">Spain</option>
+                        <option value="RU">Russia</option> */}
+                      </select>
+                    </div>
+                  </div>
 
-            <div className="flex-1 space-y-4 overflow-y-auto">
-              {filteredImages.map((image, index) => (
-                <div
-                  key={index}
-                  className="p-4 transition-colors border rounded-lg hover:bg-accent"
-                >
-                  <div className="flex items-start justify-between w-full gap-4">
-                    <div className="flex flex-col flex-1">
-                      <div className="flex flex-col items-start space-y-2">
-                        <p className="text-lg font-bold text-card-foreground">
-                          {image.company_name}
-                        </p>
-                        <div className="flex flex-col items-start space-y-1">
-                          <p className="text-sm font-medium text-card-foreground">
-                            Offer Type: {image.offerType}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Position: {image.position}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm text-muted-foreground">
-                              Format: {image.format}
-                            </p>
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            Week {image.weekNumber}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Country: {image.country}
-                          </p>
-                        </div>
+                  {/* Offer Type & Position */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Offer Type
+                      </label>
+                      <div className="flex items-center gap-4 mt-1">
+                        <select
+                          value={imageData.offerType}
+                          onChange={(e) =>
+                            handleOfferTypeChange(e.target.value as OfferType)
+                          }
+                          className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                        >
+                          {Object.keys(POSITIONS).map((offer) => (
+                            <option key={offer} value={offer}>
+                              {offer}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setIsOfferTypeModalOpen(true)}
+                          className="px-4 py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+                        >
+                          View
+                        </button>
                       </div>
                     </div>
-
-                    <div className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg">
-                      <a
-                        href={image.publicUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full h-full transition-transform hover:scale-105"
-                      >
-                        <img
-                          src={image.publicUrl}
-                          alt={`${image.company_name} - ${image.position}`}
-                          className="object-cover w-full h-full"
-                        />
-                      </a>
-                    </div>
-
-                    <div className="flex items-start">
-                      <button
-                        onClick={() => handleDelete(image)}
-                        className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 />
-                      </button>
+                    <div>
+                      <label className="block text-sm font-medium text-muted-foreground">
+                        Position
+                      </label>
+                      <div className="flex items-center gap-4 mt-1">
+                        <select
+                          value={imageData.position}
+                          onChange={(e) =>
+                            handlePositionChange(e.target.value as PositionCode)
+                          }
+                          className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                        >
+                          {POSITIONS[imageData.offerType].map((position) => (
+                            <option key={position} value={position}>
+                              {position}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
-              ))}
 
-              {filteredImages.length === 0 && selectedWeek && (
-                <p className="py-4 text-center text-muted-foreground">
-                  No images found for this week
-                </p>
-              )}
+                {/* Format */}
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground">
+                    Format
+                  </label>
+                  <div className="flex items-center gap-4 mt-1">
+                    <div className="flex-1 px-4 py-2 border rounded-md bg-gray-50">
+                      <span className="text-sm text-muted-foreground">
+                        {imageData.format}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFormat(imageData.format);
+                        setIsFormatModalOpen(true);
+                      }}
+                      className="px-4 py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+                    >
+                      View Format
+                    </button>
+                  </div>
+                </div>
+
+                {/* Upload Image */}
+                <div>
+                  <label className="block text-sm font-medium text-muted-foreground">
+                    Upload Image
+                  </label>
+                  <div className="mt-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileUpload}
+                      className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 focus:outline-none"
+                      disabled={isUploading}
+                    />
+                    {isUploading && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        Uploading... {progress}%
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isUploading}
+                  className="w-full px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
+                >
+                  {isUploading ? "Uploading..." : "Save Image"}
+                </button>
+              </form>
             </div>
-          </div>
+          )}
         </div>
       </div>
-      {isUploading && (
-        <div className="fixed bottom-0 left-0 w-full h-1 bg-gray-200">
-          <div
-            className="h-full transition-all bg-blue-600 duration-1500"
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      )}
-      <div className="h-8"></div> {/* Spacer of 32px */}
+
+      {/* Modals */}
       {isFormatModalOpen && selectedFormat && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="relative max-w-4xl p-4 bg-white rounded-lg">
