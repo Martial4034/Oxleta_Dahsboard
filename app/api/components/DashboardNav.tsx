@@ -11,8 +11,9 @@ export default function DashboardNav() {
 
   const menuDashboard = [
     { name: "Home", icon: BookCheck, path: "/dashboard/home" },
+    { name: "Client", icon: BookCheck, path: "/dashboard/client" },
     { name: "Pub", icon: BookCheck, path: "/dashboard/pub" },
-    { name: "Log", icon: BookCheck, path: "/dashboard/log" },
+    { name: "Suivi", icon: BookCheck, path: "/dashboard/suivi" },
     { name: "Settings", icon: Settings, path: "/dashboard/Settings" },
   ];
 
