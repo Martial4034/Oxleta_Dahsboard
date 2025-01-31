@@ -175,12 +175,22 @@ export default function PubPage() {
         return;
       }
 
+      if (!imageData.company_name) {
+        toast.error("Please enter a company name");
+        return;
+      }
+
+      if (!selectedWeek) {
+        toast.error("Please select a week");
+        return;
+      }
+
       setIsUploading(true);
       setProgress(0);
 
       const formData = new FormData();
       const fileExtension = imageData.selectedFile.name.split(".").pop();
-      const customFileName = `${imageData.position}.${fileExtension}`;
+      const customFileName = `week-${selectedWeek}-${imageData.position}-${imageData.company_name}.${fileExtension}`;
 
       // Créer un nouveau fichier avec le nom personnalisé
       const renamedFile = new File([imageData.selectedFile], customFileName, {
@@ -189,7 +199,7 @@ export default function PubPage() {
 
       formData.append("file", renamedFile);
       formData.append("country", "ALL");
-      formData.append("weekNumber", selectedWeek?.toString() || "");
+      formData.append("weekNumber", selectedWeek.toString());
 
       // Simuler la progression
       const progressInterval = setInterval(() => {
@@ -209,7 +219,7 @@ export default function PubPage() {
       const { publicUrl } = await uploadResponse.json();
 
       // Sauvegarder dans Firestore
-      const customDocId = `week-${imageData.weekNumber}-${imageData.position}-ALL`;
+      const customDocId = `week-${selectedWeek}-${imageData.position}-${imageData.company_name}`;
       const saveResponse = await fetch("/api/game-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -217,13 +227,18 @@ export default function PubPage() {
           customDocId,
           imageData: {
             ...imageData,
+            weekNumber: selectedWeek,
             imageUrl: publicUrl,
             publicUrl,
+            createdAt: new Date().toISOString(),
           },
         }),
       });
 
-      if (!saveResponse.ok) throw new Error("Failed to save image data");
+      if (!saveResponse.ok) {
+        const errorData = await saveResponse.json();
+        throw new Error(errorData.error || "Failed to save image data");
+      }
 
       clearInterval(progressInterval);
       setProgress(100);
@@ -498,10 +513,10 @@ export default function PubPage() {
                             value={imageData.company_name}
                             onChange={(e) => {
                               const value = e.target.value.slice(0, 20);
-                              setImageData({
-                                ...imageData,
+                              setImageData((prev) => ({
+                                ...prev,
                                 company_name: value,
-                              });
+                              }));
                             }}
                             className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
                             placeholder="Enter company name"
