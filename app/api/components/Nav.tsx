@@ -33,32 +33,35 @@ export default function Nav() {
   }, [menuOpen]);
 
   return (
-    <nav className="max-w-[2000px] w-full mx-auto h-[80px] flex items-center justify-between p-5 border-b border-gray-300">
-      <Link href="/">
-        <h1 className="text-3xl font-bold">Oxelta</h1>
-      </Link>
-      <div className="relative" ref={menuRef}>
-        {" "}
-        {/* Attach the ref here */}
-        <button onClick={toggleMenu} className="p-2">
-          <Menu className="w-6 h-6" />
-        </button>
-        {menuOpen && (
-          <div className="absolute right-0 w-64 mt-2 bg-white border rounded-lg shadow-lg">
-            <div className="p-4">
-              {user ? (
-                <>
-                  <div className="flex flex-col items-center">
-                    <p className="text-sm text-gray-700">{user.email}</p>
-                    <SignOutButton className="mt-2" />
-                  </div>
-                </>
-              ) : (
-                <p className="text-sm text-gray-700">Please log in</p>
-              )}
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+      <div className="max-w-[2000px] w-full mx-auto h-16 flex items-center justify-between px-4">
+        <Link href="/" className="flex items-center space-x-2">
+          <h1 className="text-2xl font-bold text-primary">Oxelta</h1>
+        </Link>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={toggleMenu}
+            className="p-2 transition-colors rounded-md hover:bg-gray-100"
+          >
+            <Menu className="w-6 h-6 text-gray-600" />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 w-64 mt-2 overflow-hidden bg-white border rounded-lg shadow-lg animate-in slide-in-from-top-2">
+              <div className="p-4">
+                {user ? (
+                  <>
+                    <div className="flex flex-col items-center space-y-3">
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <SignOutButton className="w-full" />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-600">Please log in</p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </nav>
   );

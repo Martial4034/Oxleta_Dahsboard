@@ -1,11 +1,10 @@
 "use client";
 
-import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
 import imageCompression from "browser-image-compression";
+import Link from "next/link";
 import { ChangeEvent, useEffect, useState } from "react";
 import Calendar from "react-calendar";
-import { useAuthState } from "react-firebase-hooks/auth";
 import { toast } from "sonner";
 import {
   OfferType,
@@ -28,10 +27,19 @@ export interface ImageData {
   format: string;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  formats: Record<string, boolean>;
+}
+
+interface MissingFormat {
+  format: string;
+  position: string;
+}
+
 export default function PubPage() {
-  const [user] = useAuthState(auth);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [imageData, setImageData] = useState<
     Omit<ImageData, "id" | "createdAt">
   >({
@@ -47,8 +55,15 @@ export default function PubPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isFormatModalOpen, setIsFormatModalOpen] = useState(false);
-  const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const [selectedFormat] = useState<string | null>(null);
   const [isOfferTypeModalOpen, setIsOfferTypeModalOpen] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedOfferType, setSelectedOfferType] =
+    useState<OfferType>("Premium 1");
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [missingFormats, setMissingFormats] = useState<MissingFormat[]>([]);
+  const [isPartnerMode, setIsPartnerMode] = useState(false);
 
   const getCurrentWeek = () => {
     const today = new Date();
@@ -100,19 +115,8 @@ export default function PubPage() {
 
   const handleDateSelect = (date: Date) => {
     const weekNum = getWeekNumber(date);
-    const { monday } = getWeekDates(date);
-    setSelectedWeek(getWeekNumber(monday));
-    setShowForm(true);
-    setImageData((prev) => ({ ...prev, weekNumber: weekNum }));
-  };
-  const bucketName =
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
-    "your-project-id.appspot.com";
-
-  const generatePublicUrl = (bucketName: string, imagePath: string): string => {
-    return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(
-      imagePath
-    )}`;
+    setSelectedWeek(weekNum);
+    setIsUploadModalOpen(true);
   };
 
   const compressImage = async (file: File) => {
@@ -175,91 +179,70 @@ export default function PubPage() {
       setProgress(0);
 
       const formData = new FormData();
-
       const fileExtension = imageData.selectedFile.name.split(".").pop();
-      const customFileName = `week-${imageData.weekNumber}-${imageData.position}.${fileExtension}`;
+      const customFileName = `${imageData.position}.${fileExtension}`;
 
-      // Pas besoin de recompresser ici car déjà fait dans handleFileUpload
+      // Créer un nouveau fichier avec le nom personnalisé
       const renamedFile = new File([imageData.selectedFile], customFileName, {
-        type: "image/jpeg", // Force JPEG pour une meilleure compression
+        type: imageData.selectedFile.type,
       });
 
       formData.append("file", renamedFile);
-      formData.append("country", imageData.country);
+      formData.append("country", "ALL");
+      formData.append("weekNumber", selectedWeek?.toString() || "");
+
+      // Simuler la progression
+      const progressInterval = setInterval(() => {
+        setProgress((prev) => (prev >= 90 ? prev : prev + 5));
+      }, 200);
 
       const uploadResponse = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
 
-      const uploadData = await uploadResponse.json();
-
       if (!uploadResponse.ok) {
-        throw new Error(uploadData.error || "Upload failed");
+        const error = await uploadResponse.json();
+        throw new Error(error.error || "Upload failed");
       }
 
-      const positionNumber = imageData.position.split("-")[2];
-      const imagePath = `pub_images/${imageData.country}/week${imageData.weekNumber}/${positionNumber}/${customFileName}`;
-      const imageUrl = generatePublicUrl(bucketName, imagePath);
-      const publicUrl = `https://storage.googleapis.com/${bucketName}/${imagePath}`;
+      const { publicUrl } = await uploadResponse.json();
 
-      const customDocId = `week-${imageData.weekNumber}-${imageData.position}-${imageData.country}`;
-
+      // Sauvegarder dans Firestore
+      const customDocId = `week-${imageData.weekNumber}-${imageData.position}-ALL`;
       const saveResponse = await fetch("/api/game-images", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customDocId,
           imageData: {
             ...imageData,
-            imageUrl,
+            imageUrl: publicUrl,
             publicUrl,
           },
         }),
       });
 
-      if (!saveResponse.ok) throw new Error("Failed to save image");
+      if (!saveResponse.ok) throw new Error("Failed to save image data");
 
-      const timestamp = new Date().toLocaleString("fr-FR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      });
+      clearInterval(progressInterval);
+      setProgress(100);
 
-      console.log(`✅ Image ajoutée par ${user?.email} le ${timestamp}`);
-      console.log(`📁 Emplacement: ${imagePath}`);
-      console.log(
-        `📊 Détails: Semaine ${imageData.weekNumber}, Position ${imageData.position}, Pays ${imageData.country}`
-      );
-
-      setShowForm(false);
+      toast.success("Image uploaded successfully");
+      setIsUploadModalOpen(false);
       setImageData((prev) => ({
         ...prev,
-        imageUrl: "",
-        offerType: "Premium 1",
-        position: "P-1-1-1",
-        weekNumber: selectedWeek || 0,
+        selectedFile: undefined,
         company_name: "",
-        country: "ALL",
-        format: POSITION_FORMATS["P-1-1-1"],
       }));
-
-      toast.success("Image saved successfully!");
     } catch (error) {
-      console.error("❌ Erreur lors de l'ajout de l'image:", error);
-      toast.error("Error saving image data. Please try again.");
+      console.error("Error during upload:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image"
+      );
     } finally {
-      setTimeout(() => {
-        setProgress(100);
-        setTimeout(() => {
-          setIsUploading(false);
-        }, 500);
-      }, 500);
+      setIsUploading(false);
+      setProgress(0);
     }
   };
 
@@ -305,16 +288,145 @@ export default function PubPage() {
     return "";
   };
 
+  // Charger la liste des clients
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const response = await fetch("/api/clients");
+        const data = await response.json();
+        setClients(data.clients);
+      } catch (error) {
+        console.error("Error fetching clients:", error);
+        toast.error("Failed to load clients");
+      }
+    };
+    fetchClients();
+  }, []);
+
+  // Fonction pour copier les images
+  const handleAutomaticUpload = async () => {
+    if (!selectedClient || !selectedWeek) {
+      toast.error("Please select a client and week");
+      return;
+    }
+
+    setIsUploading(true);
+    setProgress(0);
+
+    try {
+      const positions = POSITIONS[selectedOfferType];
+      let uploadedCount = 0;
+
+      for (const position of positions) {
+        const format = POSITION_FORMATS[position];
+
+        // Vérifier si le format existe pour le client
+        if (!selectedClient.formats[format]) {
+          toast.error(
+            `Missing format ${format} for client ${selectedClient.name}`
+          );
+          continue;
+        }
+
+        // Copier l'image
+        const response = await fetch("/api/copy-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientName: selectedClient.name,
+            format,
+            weekNumber: selectedWeek,
+            position,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to copy image for position ${position}`);
+        }
+
+        const { publicUrl } = await response.json();
+
+        // Sauvegarder les informations dans Firestore
+        const customDocId = `week-${selectedWeek}-${position}-ALL`;
+        const saveResponse = await fetch("/api/game-images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customDocId,
+            imageData: {
+              imageUrl: publicUrl,
+              publicUrl,
+              offerType: selectedOfferType,
+              position,
+              weekNumber: selectedWeek,
+              company_name: selectedClient.name,
+              country: "ALL",
+              format,
+            },
+          }),
+        });
+
+        if (!saveResponse.ok) {
+          throw new Error(`Failed to save image data for position ${position}`);
+        }
+
+        uploadedCount++;
+        setProgress((uploadedCount / positions.length) * 100);
+      }
+
+      toast.success("Images uploaded successfully");
+    } catch (error) {
+      console.error("Error during automatic upload:", error);
+      toast.error("Failed to upload images");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const checkMissingFormats = (
+    client: Client,
+    offerType: OfferType
+  ): MissingFormat[] => {
+    const positions = POSITIONS[offerType];
+    const missing: MissingFormat[] = [];
+
+    positions.forEach((position) => {
+      const format = POSITION_FORMATS[position];
+      if (!client.formats[format]) {
+        missing.push({ format, position });
+      }
+    });
+
+    return missing;
+  };
+
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
       <div className="max-w-4xl p-4 mx-auto md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Pub Management</h1>
-          <h2 className="p-2 text-lg font-semibold text-card-foreground">
-            {selectedWeek
-              ? `Images for Week ${selectedWeek}`
-              : "Loading current week..."}
-          </h2>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isPartnerMode}
+                onChange={(e) => {
+                  setIsPartnerMode(e.target.checked);
+                  if (e.target.checked) {
+                    setSelectedClient(null);
+                    setMissingFormats([]);
+                  }
+                }}
+                className="w-4 h-4 border-gray-300 rounded text-primary focus:ring-primary"
+              />
+              Offre partenaire
+            </label>
+            <h2 className="p-2 text-lg font-semibold text-card-foreground">
+              {selectedWeek
+                ? `Images for Week ${selectedWeek}`
+                : "Loading current week..."}
+            </h2>
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -336,163 +448,261 @@ export default function PubPage() {
             </div>
           </div>
 
-          {/* Formulaire d'ajout d'image */}
-          {showForm && (
-            <div className="p-6 border shadow-sm bg-card rounded-xl">
-              <h2 className="mb-6 text-xl font-semibold text-card-foreground">
-                Add Image for Week {selectedWeek}
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  {/* Company Name & Country */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Company Name
-                      </label>
-                      <input
-                        type="text"
-                        value={imageData.company_name}
-                        onChange={(e) => {
-                          const value = e.target.value.slice(0, 20);
-                          setImageData({
-                            ...imageData,
-                            company_name: value,
-                          });
-                        }}
-                        className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                        placeholder="Enter company name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Country
-                      </label>
-                      <select
-                        value={imageData.country}
-                        onChange={(e) =>
-                          setImageData({
-                            ...imageData,
-                            country: e.target.value,
-                          })
-                        }
-                        className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                      >
-                        <option value="ALL">All Countries</option>
-                        {/* <option value="FR">France</option>
-                        <option value="ESP">Spain</option>
-                        <option value="RU">Russia</option> */}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Offer Type & Position */}
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Offer Type
-                      </label>
-                      <div className="flex items-center gap-4 mt-1">
-                        <select
-                          value={imageData.offerType}
-                          onChange={(e) =>
-                            handleOfferTypeChange(e.target.value as OfferType)
-                          }
-                          className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                        >
-                          {Object.keys(POSITIONS).map((offer) => (
-                            <option key={offer} value={offer}>
-                              {offer}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setIsOfferTypeModalOpen(true)}
-                          className="px-4 py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
-                        >
-                          View
-                        </button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-muted-foreground">
-                        Position
-                      </label>
-                      <div className="flex items-center gap-4 mt-1">
-                        <select
-                          value={imageData.position}
-                          onChange={(e) =>
-                            handlePositionChange(e.target.value as PositionCode)
-                          }
-                          className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
-                        >
-                          {POSITIONS[imageData.offerType].map((position) => (
-                            <option key={position} value={position}>
-                              {position}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+          {/* Modal d'upload */}
+          {isUploadModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+              <div className="w-full max-w-2xl p-6 bg-white rounded-lg">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold">
+                    Add Images for Week {selectedWeek}
+                  </h2>
+                  <button
+                    onClick={() => setIsUploadModalOpen(false)}
+                    className="p-2 text-gray-500 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
                 </div>
 
-                {/* Format */}
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground">
-                    Format
-                  </label>
-                  <div className="flex items-center gap-4 mt-1">
-                    <div className="flex-1 px-4 py-2 border rounded-md bg-gray-50">
-                      <span className="text-sm text-muted-foreground">
-                        {imageData.format}
-                      </span>
+                {/* Condition pour afficher soit le mode partenaire, soit le mode normal */}
+                {isPartnerMode ? (
+                  <div className="space-y-6">
+                    {/* Formulaire manuel complet */}
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                      {/* Company Name & Offer Type */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-muted-foreground">
+                            Company Name
+                          </label>
+                          <input
+                            type="text"
+                            value={imageData.company_name}
+                            onChange={(e) => {
+                              const value = e.target.value.slice(0, 20);
+                              setImageData({
+                                ...imageData,
+                                company_name: value,
+                              });
+                            }}
+                            className="block w-full px-3 py-2 mt-1 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                            placeholder="Enter company name"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-muted-foreground">
+                            Offer Type
+                          </label>
+                          <div className="flex items-center gap-4 mt-1">
+                            <select
+                              value={imageData.offerType}
+                              onChange={(e) =>
+                                handleOfferTypeChange(
+                                  e.target.value as OfferType
+                                )
+                              }
+                              className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                            >
+                              {Object.keys(POSITIONS).map((offer) => (
+                                <option key={offer} value={offer}>
+                                  {offer}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => setIsOfferTypeModalOpen(true)}
+                              className="px-4 py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Position & Upload */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-muted-foreground">
+                            Position
+                          </label>
+                          <div className="flex items-center gap-4 mt-1">
+                            <select
+                              value={imageData.position}
+                              onChange={(e) =>
+                                handlePositionChange(
+                                  e.target.value as PositionCode
+                                )
+                              }
+                              className="flex-1 block w-full px-3 py-2 border rounded-md shadow-sm bg-input text-input-foreground focus:border-ring focus:ring-ring"
+                            >
+                              {POSITIONS[imageData.offerType].map(
+                                (position) => (
+                                  <option key={position} value={position}>
+                                    {position}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-muted-foreground">
+                            Upload Image ({imageData.format})
+                          </label>
+                          <div className="mt-2">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 focus:outline-none"
+                              disabled={isUploading}
+                            />
+                            {isUploading && (
+                              <div className="mt-2 text-sm text-muted-foreground">
+                                Uploading... {progress}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
+
+                    {/* Submit Button */}
                     <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedFormat(imageData.format);
-                        setIsFormatModalOpen(true);
-                      }}
-                      className="px-4 py-2 text-sm font-semibold text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700"
+                      onClick={handleSubmit}
+                      disabled={
+                        isUploading ||
+                        !imageData.selectedFile ||
+                        !imageData.company_name
+                      }
+                      className="w-full px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
                     >
-                      View Format
+                      {isUploading ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>Uploading... {Math.round(progress)}%</span>
+                        </div>
+                      ) : (
+                        "Save Image"
+                      )}
                     </button>
-                  </div>
-                </div>
 
-                {/* Upload Image */}
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground">
-                    Upload Image
-                  </label>
-                  <div className="mt-2">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                      className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 focus:outline-none"
-                      disabled={isUploading}
-                    />
                     {isUploading && (
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        Uploading... {progress}%
+                      <div className="w-full h-2 overflow-hidden bg-gray-200 rounded-full">
+                        <div
+                          className="h-full transition-all duration-300 bg-blue-600"
+                          style={{ width: `${progress}%` }}
+                        />
                       </div>
                     )}
                   </div>
-                </div>
+                ) : (
+                  // Mode normal avec sélection de client
+                  <>
+                    {/* Sélection du client */}
+                    <div className="mb-6">
+                      <label className="block mb-2 text-sm font-medium">
+                        Select Client
+                      </label>
+                      <select
+                        value={selectedClient?.id || ""}
+                        onChange={(e) => {
+                          const client = clients.find(
+                            (c) => c.id === e.target.value
+                          );
+                          setSelectedClient(client || null);
+                          if (client) {
+                            const missing = checkMissingFormats(
+                              client,
+                              selectedOfferType
+                            );
+                            setMissingFormats(missing);
+                          }
+                        }}
+                        className="w-full p-2 border rounded"
+                      >
+                        <option value="">Select a client...</option>
+                        {clients.map((client) => (
+                          <option key={client.id} value={client.id}>
+                            {client.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={isUploading}
-                  className="w-full px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {isUploading ? "Uploading..." : "Save Image"}
-                </button>
-              </form>
+                    {/* Type d'offre */}
+                    <div className="mb-6">
+                      <label className="block mb-2 text-sm font-medium">
+                        Offer Type
+                      </label>
+                      <select
+                        value={selectedOfferType}
+                        onChange={(e) => {
+                          const newType = e.target.value as OfferType;
+                          setSelectedOfferType(newType);
+                          const missing = checkMissingFormats(
+                            selectedClient as Client,
+                            newType
+                          );
+                          setMissingFormats(missing);
+                        }}
+                        className="w-full p-2 border rounded"
+                      >
+                        {Object.keys(POSITIONS).map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Affichage des formats manquants */}
+                    {missingFormats.length > 0 && (
+                      <div className="p-4 mb-6 text-red-700 bg-red-100 rounded-lg">
+                        <h3 className="mb-2 font-semibold">Missing Formats:</h3>
+                        <ul className="ml-4 list-disc">
+                          {missingFormats.map(({ format, position }) => (
+                            <li key={position}>
+                              Format {format} for position {position}
+                            </li>
+                          ))}
+                        </ul>
+                        <Link
+                          href="/dashboard/client"
+                          className="inline-block px-4 py-2 mt-4 text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                        >
+                          Add Missing Formats
+                        </Link>
+                      </div>
+                    )}
+
+                    {/* Bouton d'upload */}
+                    <button
+                      onClick={handleAutomaticUpload}
+                      disabled={isUploading || missingFormats.length > 0}
+                      className="w-full px-4 py-2 text-white transition-colors rounded-md bg-primary hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <div className="flex items-center justify-center space-x-2">
+                          <span>Uploading... {Math.round(progress)}%</span>
+                        </div>
+                      ) : (
+                        "Upload Images"
+                      )}
+                    </button>
+
+                    {isUploading && (
+                      <div className="w-full h-2 mt-4 overflow-hidden bg-gray-200 rounded-full">
+                        <div
+                          className="h-full transition-all duration-300 bg-blue-600"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </div>

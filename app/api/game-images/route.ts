@@ -114,3 +114,25 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const { docId, updates } = await request.json();
+
+    const docRef = adminDb.collection("game-images").doc(docId);
+    await docRef.update(updates);
+
+    return NextResponse.json({
+      success: true,
+    });
+  } catch (error) {
+    console.error("Error updating game image:", error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to update image",
+      },
+      { status: 500 }
+    );
+  }
+}

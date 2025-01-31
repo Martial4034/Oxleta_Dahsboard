@@ -2,7 +2,7 @@
 
 import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
-import { Trash2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import Calendar from "react-calendar";
@@ -16,6 +16,8 @@ export default function SuiviPage() {
   const [weekImages, setWeekImages] = useState<ImageData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCountry, setSelectedCountry] = useState<string>("");
+  const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
+  const [deleteProgress, setDeleteProgress] = useState(0);
 
   // Réutiliser les fonctions nécessaires de PubPage
   const getWeekNumber = (date: Date): number => {
@@ -84,12 +86,24 @@ export default function SuiviPage() {
   const handleDelete = async (image: ImageData) => {
     try {
       const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
+      setDeletingImageId(docId);
+      setDeleteProgress(0);
+
+      // Simuler une progression
+      const progressInterval = setInterval(() => {
+        setDeleteProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
       const positionNumber = image.position.split("-")[2];
       const imagePath = `pub_images/${image.country}/week${
         image.weekNumber
-      }/${positionNumber}/week-${image.weekNumber}-${
-        image.position
-      }.${image.imageUrl.split(".").pop()}`;
+      }/${positionNumber}/${image.position}.${image.imageUrl.split(".").pop()}`;
 
       const response = await fetch("/api/game-images/delete", {
         method: "DELETE",
@@ -107,6 +121,10 @@ export default function SuiviPage() {
       if (!response.ok) {
         throw new Error(data.error || "Failed to delete image");
       }
+
+      // Compléter la progression
+      setDeleteProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const timestamp = new Date().toLocaleString("fr-FR", {
         hour: "2-digit",
@@ -133,6 +151,62 @@ export default function SuiviPage() {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete image"
       );
+    } finally {
+      setDeletingImageId(null);
+      setDeleteProgress(0);
+    }
+  };
+
+  const handleImageClick = async (image: ImageData) => {
+    if (image.publicUrl) {
+      // Si l'URL publique existe déjà, ouvrir dans un nouvel onglet
+      window.open(image.publicUrl, "_blank");
+    } else {
+      try {
+        // Créer une URL publique
+        const positionNumber = image.position.split("-")[2];
+        const fileExtension = image.imageUrl.split(".").pop();
+        const imagePath = `pub_images/ALL/week${image.weekNumber}/${positionNumber}/${image.position}.${fileExtension}`;
+
+        // Faire la requête pour rendre l'image publique
+        const response = await fetch("/api/make-public", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ imagePath }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to make image public");
+        }
+
+        const { publicUrl } = await response.json();
+
+        // Mettre à jour le document dans Firestore
+        const docId = `week-${image.weekNumber}-${image.position}-${image.country}`;
+        await fetch("/api/game-images", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            docId,
+            updates: { publicUrl },
+          }),
+        });
+
+        // Ouvrir la nouvelle URL publique
+        window.open(publicUrl, "_blank");
+
+        // Rafraîchir les images
+        if (selectedWeek) {
+          await fetchWeekImages(selectedWeek);
+        }
+      } catch (error) {
+        console.error("Error making image public:", error);
+        toast.error("Failed to generate public URL");
+      }
     }
   };
 
@@ -239,22 +313,39 @@ export default function SuiviPage() {
                         </div>
                       </div>
 
-                      <div className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg">
+                      <div
+                        className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg cursor-pointer"
+                        onClick={() => handleImageClick(image)}
+                      >
                         <Image
-                          src={image.publicUrl}
+                          src={image.publicUrl || image.imageUrl}
                           alt={`${image.company_name} - ${image.position}`}
                           width={120}
                           height={120}
-                          className="object-cover w-full h-full"
+                          className="object-cover w-full h-full hover:opacity-80 transition-opacity"
                         />
                       </div>
 
                       <div className="flex items-start">
                         <button
                           onClick={() => handleDelete(image)}
-                          className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10"
+                          disabled={deletingImageId !== null}
+                          className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10 disabled:opacity-50"
                         >
-                          <Trash2 />
+                          {deletingImageId ===
+                          `week-${image.weekNumber}-${image.position}-${image.country}` ? (
+                            <div className="flex flex-col items-center">
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                              <div className="w-10 h-1 mt-1 overflow-hidden bg-gray-200 rounded-full">
+                                <div
+                                  className="h-full transition-all duration-300 bg-red-600"
+                                  style={{ width: `${deleteProgress}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
                         </button>
                       </div>
                     </div>

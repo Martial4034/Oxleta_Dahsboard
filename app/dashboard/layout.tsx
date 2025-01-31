@@ -4,13 +4,15 @@ import { ReactNode } from "react";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <ProtectedRoute>
-      <section className="max-w-[2000px] mx-auto flex flex-col md:flex-row h-screen w-full p-2">
-        <div className="md:w-64 md:min-h-screen">
-          <DashboardNav />
-        </div>
-        <main className="flex-1 p-4 md:p-6">{children}</main>
-      </section>
-    </ProtectedRoute>
+    <div className="min-h-screen bg-gray-100">
+      <ProtectedRoute>
+        <section className="max-w-[2000px] mx-auto flex flex-col md:flex-row h-screen w-full p-2">
+          <div className="md:w-64 md:min-h-screen">
+            <DashboardNav />
+          </div>
+          <main className="flex-1 p-4 md:p-6">{children}</main>
+        </section>
+      </ProtectedRoute>
+    </div>
   );
 }

@@ -27,11 +27,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-gray-100`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-gray-100`}
         suppressHydrationWarning
       >
         <Nav />
-        {children}
+        <main className="pt-16 min-h-[calc(100vh-4rem)]">{children}</main>
         <Toaster />
       </body>
     </html>
