@@ -154,6 +154,13 @@ export function OfferChart() {
     return null;
   };
 
+  const getSelectedWeekData = (selectedWeek: string): WeekData | undefined => {
+    if (selectedWeek === "current") return weeksData[0];
+
+    const weekNumber = parseInt(selectedWeek.replace("week", ""));
+    return weeksData.find((data) => data.weekNumber === weekNumber);
+  };
+
   if (isLoading) {
     return (
       <Card className="w-full">
@@ -252,15 +259,9 @@ export function OfferChart() {
       </CardContent>
       <CardFooter className="flex-col items-start gap-2 text-sm">
         <div className="leading-none text-muted-foreground">
-          Total offers for week{" "}
-          {
-            weeksData[parseInt(selectedWeek.replace(/\D/g, "")) || 0]
-              ?.weekNumber
-          }
-          :{" "}
+          Total offers for week {getSelectedWeekData(selectedWeek)?.weekNumber}:{" "}
           <span className="font-medium text-foreground">
-            {weeksData[parseInt(selectedWeek.replace(/\D/g, "")) || 0]?.total ||
-              0}
+            {getSelectedWeekData(selectedWeek)?.total || 0}
           </span>
         </div>
       </CardFooter>
