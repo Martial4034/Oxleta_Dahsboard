@@ -282,17 +282,15 @@ export default function PubPage() {
   const tileClassName = ({ date, view }: { date: Date; view: string }) => {
     if (view === "month" && selectedWeek) {
       const currentDate = new Date(date);
-      const selectedDate = new Date();
-      selectedDate.setDate(
-        selectedDate.getDate() +
-          (selectedWeek - getWeekNumber(selectedDate)) * 7
-      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Reset time part for accurate date comparison
 
-      const { monday, sunday } = getWeekDates(selectedDate);
+      const { monday, sunday } = getWeekDates(today);
       const isInSelectedWeek = currentDate >= monday && currentDate <= sunday;
       const isToday = new Date().toDateString() === date.toDateString();
       const isSunday = date.getDay() === 0;
       const isSaturday = date.getDay() === 6;
+      const isPastDate = currentDate < today;
 
       return `
         relative
@@ -302,7 +300,6 @@ export default function PubPage() {
         hover:text-accent-foreground
         focus:bg-accent
         focus:text-accent-foreground
-        rounded-md
         ${
           isInSelectedWeek
             ? "bg-primary/90 text-primary-foreground font-medium"
@@ -310,12 +307,14 @@ export default function PubPage() {
         }
         ${isToday ? "bg-[#09090b] text-white border-[#09090b]" : ""}
         ${
-          isSunday
+          isSunday || isPastDate
             ? "text-destructive/70 cursor-not-allowed hover:bg-destructive/10 hover:text-destructive"
             : ""
         }
         ${isSaturday ? "text-destructive/50" : ""}
-        ${!isInSelectedWeek && !isSunday ? "hover:scale-105" : ""}
+        ${
+          !isInSelectedWeek && !isSunday && !isPastDate ? "hover:scale-105" : ""
+        }
       `.trim();
     }
     return "";
@@ -474,9 +473,14 @@ export default function PubPage() {
                 className="w-full border-none rounded-lg bg-card text-card-foreground [&_.react-calendar__month-view__weekdays]:mb-4 [&_.react-calendar__month-view__weekdays__weekday]:text-muted-foreground [&_.react-calendar__month-view__weekdays__weekday]:font-normal [&_.react-calendar__month-view__days__day]:h-10 [&_.react-calendar__month-view__days__day]:w-10 [&_.react-calendar__month-view__days__day]:rounded-md [&_.react-calendar__month-view__days__day]:my-1"
                 tileClassName={tileClassName}
                 calendarType="iso8601"
-                tileDisabled={({ date, view }) =>
-                  view === "month" && date.getDay() === 0
-                }
+                tileDisabled={({ date, view }) => {
+                  if (view === "month") {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date.getDay() === 0 || date < today;
+                  }
+                  return false;
+                }}
               />
             </div>
           </div>
