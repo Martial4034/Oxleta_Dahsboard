@@ -322,7 +322,7 @@ export default function SuiviPage() {
                           alt={`${image.company_name} - ${image.position}`}
                           width={120}
                           height={120}
-                          className="object-cover w-full h-full hover:opacity-80 transition-opacity"
+                          className="object-cover w-full h-full transition-opacity hover:opacity-80"
                         />
                       </div>
 

@@ -1,6 +1,13 @@
 "use client";
 
-import { BookCheck, Menu, Settings } from "lucide-react";
+import {
+  BookCheck,
+  BookOpenCheck,
+  BookPlus,
+  House,
+  Menu,
+  Settings,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -10,10 +17,10 @@ export default function DashboardNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const menuDashboard = [
-    { name: "Home", icon: BookCheck, path: "/dashboard/home" },
+    { name: "Home", icon: House, path: "/dashboard/home" },
     { name: "Gestion des Clients", icon: BookCheck, path: "/dashboard/client" },
-    { name: "Ajout de Pub", icon: BookCheck, path: "/dashboard/pub" },
-    { name: "Suivi des Pubs", icon: BookCheck, path: "/dashboard/suivi" },
+    { name: "Ajout de Pub", icon: BookPlus, path: "/dashboard/pub" },
+    { name: "Suivi des Pubs", icon: BookOpenCheck, path: "/dashboard/suivi" },
     { name: "Settings", icon: Settings, path: "/dashboard/Settings" },
   ];
 

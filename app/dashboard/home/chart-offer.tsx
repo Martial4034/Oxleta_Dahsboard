@@ -35,6 +35,16 @@ interface ClientCount {
   [client: string]: number;
 }
 
+// Définir les totaux disponibles pour chaque type d'offre
+const OFFER_LIMITS = {
+  "Premium 1": 12,
+  "Gold 1": 6,
+  "Gold 2": 6,
+  "Silver 1": 7,
+  "Silver 2": 7,
+  "Silver 3": 7,
+} as const;
+
 export function OfferChart() {
   const [weeksData, setWeeksData] = useState<WeekData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -123,6 +133,7 @@ export function OfferChart() {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      const total = OFFER_LIMITS[data.name as keyof typeof OFFER_LIMITS];
 
       // Compter les occurrences de chaque client
       const clientCounts = data.clients.reduce(
@@ -137,7 +148,7 @@ export function OfferChart() {
         <div className="p-4 bg-white border rounded-lg shadow-lg">
           <p className="font-semibold">{data.name}</p>
           <p className="mb-2 text-sm text-muted-foreground">
-            Total: {data.count}
+            Reserved: {data.count} / {total}
           </p>
           {Object.keys(clientCounts).length > 0 && (
             <div className="space-y-1">
@@ -246,9 +257,21 @@ export function OfferChart() {
                     <LabelList
                       dataKey="count"
                       position="top"
-                      offset={10}
-                      className="fill-foreground"
-                      fontSize={12}
+                      content={({ x, y, width, value, index }: any) => {
+                        const data = week.data[index];
+                        const total =
+                          OFFER_LIMITS[data.name as keyof typeof OFFER_LIMITS];
+                        return (
+                          <text
+                            x={Number(x) + Number(width) / 2}
+                            y={Number(y) - 10}
+                            textAnchor="middle"
+                            className="text-xs fill-foreground"
+                          >
+                            {`${value}/${total}`}
+                          </text>
+                        );
+                      }}
                     />
                   </Bar>
                 </BarChart>

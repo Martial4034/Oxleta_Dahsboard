@@ -38,6 +38,12 @@ interface MissingFormat {
   position: string;
 }
 
+// Ajout d'une interface pour les offres réservées
+interface ReservedOffer {
+  offerType: OfferType;
+  company_name: string;
+}
+
 export default function PubPage() {
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [imageData, setImageData] = useState<
@@ -64,6 +70,7 @@ export default function PubPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [missingFormats, setMissingFormats] = useState<MissingFormat[]>([]);
   const [isPartnerMode, setIsPartnerMode] = useState(false);
+  const [reservedOffers, setReservedOffers] = useState<ReservedOffer[]>([]);
 
   const getCurrentWeek = () => {
     const today = new Date();
@@ -270,6 +277,13 @@ export default function PubPage() {
   };
 
   const handleOfferTypeChange = (newOfferType: OfferType) => {
+    // Vérifier si l'offre est déjà réservée
+    if (isOfferReserved(newOfferType)) {
+      const reservedBy = getReservedBy(newOfferType);
+      toast.error(`This offer is already reserved by ${reservedBy}`);
+      return;
+    }
+
     const newPosition = POSITIONS[newOfferType][0];
     setImageData((prev) => ({
       ...prev,
@@ -277,6 +291,7 @@ export default function PubPage() {
       position: newPosition,
       format: POSITION_FORMATS[newPosition],
     }));
+    setSelectedOfferType(newOfferType);
   };
 
   const tileClassName = ({ date, view }: { date: Date; view: string }) => {
@@ -305,7 +320,7 @@ export default function PubPage() {
             ? "bg-primary/90 text-primary-foreground font-medium"
             : ""
         }
-        ${isToday ? "bg-[#09090b] text-white border-[#09090b]" : ""}
+        ${isToday ? "bg-chart-1 text-white border-[#09090b]" : ""}
         ${
           isSunday || isPastDate
             ? "text-destructive/70 cursor-not-allowed hover:bg-destructive/10 hover:text-destructive"
@@ -430,6 +445,49 @@ export default function PubPage() {
     });
 
     return missing;
+  };
+
+  // Fonction pour récupérer les offres déjà réservées pour la semaine sélectionnée
+  const fetchReservedOffers = async (weekNumber: number) => {
+    try {
+      const response = await fetch(`/api/offer-stats?weekNumber=${weekNumber}`);
+      if (!response.ok) throw new Error("Failed to fetch reserved offers");
+      const data = await response.json();
+
+      const reserved: ReservedOffer[] = [];
+      Object.entries(data).forEach(([offerType, info]: [string, any]) => {
+        if (info.count > 0) {
+          info.clients.forEach((client: string) => {
+            reserved.push({
+              offerType: offerType as OfferType,
+              company_name: client,
+            });
+          });
+        }
+      });
+      setReservedOffers(reserved);
+    } catch (error) {
+      console.error("Error fetching reserved offers:", error);
+      toast.error("Failed to load reserved offers");
+    }
+  };
+
+  // Mettre à jour useEffect pour charger les offres réservées
+  useEffect(() => {
+    if (selectedWeek) {
+      fetchReservedOffers(selectedWeek);
+    }
+  }, [selectedWeek]);
+
+  // Fonction pour vérifier si une offre est déjà réservée
+  const isOfferReserved = (offerType: OfferType) => {
+    return reservedOffers.some((offer) => offer.offerType === offerType);
+  };
+
+  // Fonction pour obtenir le nom du client qui a réservé l'offre
+  const getReservedBy = (offerType: OfferType) => {
+    const offer = reservedOffers.find((o) => o.offerType === offerType);
+    return offer?.company_name;
   };
 
   return (
@@ -668,7 +726,7 @@ export default function PubPage() {
                       </select>
                     </div>
 
-                    {/* Type d'offre */}
+                    {/* Sélection du type d'offre */}
                     <div className="mb-6">
                       <label className="block mb-2 text-sm font-medium">
                         Offer Type
@@ -677,20 +735,33 @@ export default function PubPage() {
                         value={selectedOfferType}
                         onChange={(e) => {
                           const newType = e.target.value as OfferType;
-                          setSelectedOfferType(newType);
-                          const missing = checkMissingFormats(
-                            selectedClient as Client,
-                            newType
-                          );
-                          setMissingFormats(missing);
+                          handleOfferTypeChange(newType);
+                          if (selectedClient) {
+                            const missing = checkMissingFormats(
+                              selectedClient,
+                              newType
+                            );
+                            setMissingFormats(missing);
+                          }
                         }}
                         className="w-full p-2 border rounded"
                       >
-                        {Object.keys(POSITIONS).map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
+                        {Object.keys(POSITIONS).map((type) => {
+                          const isReserved = isOfferReserved(type as OfferType);
+                          const reservedBy = getReservedBy(type as OfferType);
+
+                          return (
+                            <option
+                              key={type}
+                              value={type}
+                              disabled={isReserved}
+                              className={isReserved ? "text-gray-400" : ""}
+                            >
+                              {type}{" "}
+                              {isReserved ? `(Reserved by ${reservedBy})` : ""}
+                            </option>
+                          );
+                        })}
                       </select>
                     </div>
 

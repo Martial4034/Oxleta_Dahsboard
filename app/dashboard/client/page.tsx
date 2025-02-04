@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Search, SquarePlus, Trash2 } from "lucide-react";
+import { Eye, Loader2, Search, SquarePlus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -49,6 +49,10 @@ export default function ClientPage() {
     file: File;
   } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{
+    url: string;
+    format: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -258,6 +262,56 @@ export default function ClientPage() {
     client.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Fonction pour prévisualiser l'image
+  const handlePreviewClick = async (clientName: string, format: string) => {
+    try {
+      const extensions = [
+        "jpg",
+        "jpeg",
+        "png",
+        "webp",
+        "JPG",
+        "JPEG",
+        "PNG",
+        "WEBP",
+        "svg",
+        "SVG",
+      ];
+      let publicUrl = null;
+
+      // Essayer chaque extension jusqu'à ce qu'une image soit trouvée
+      for (const ext of extensions) {
+        const fileRef = `client/${clientName}/${format}/${format}.${ext}`;
+        try {
+          const response = await fetch("/api/make-public", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ imagePath: fileRef }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            publicUrl = data.publicUrl;
+            break; // Sortir de la boucle si une image est trouvée
+          }
+        } catch {
+          continue; // Continuer avec la prochaine extension si celle-ci échoue
+        }
+      }
+
+      if (!publicUrl) {
+        throw new Error("No image found with any supported extension");
+      }
+
+      setPreviewImage({ url: publicUrl, format });
+    } catch (error) {
+      console.error("Error loading preview:", error);
+      toast.error("Failed to load image preview");
+    }
+  };
+
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
       <div className="p-4 mx-auto max-w-7xl md:p-8">
@@ -321,25 +375,38 @@ export default function ClientPage() {
                           <span className="ml-2 text-green-500">✓</span>
                         )}
                       </span>
-                      <button
-                        onClick={() => handleUploadClick(client, format)}
-                        disabled={
-                          isUploading ||
-                          (uploadingFormat?.clientId === client.id &&
-                            uploadingFormat?.format === format)
-                        }
-                        className="flex items-center gap-2 px-3 py-1 text-sm text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        {uploadingFormat?.clientId === client.id &&
-                        uploadingFormat?.format === format ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Uploading...
-                          </>
-                        ) : (
-                          <>Upload Image</>
+                      <div className="flex items-center gap-2">
+                        {client.formats[format] && (
+                          <button
+                            onClick={() =>
+                              handlePreviewClick(client.name, format)
+                            }
+                            className="p-2 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
+                            title="Preview image"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                         )}
-                      </button>
+                        <button
+                          onClick={() => handleUploadClick(client, format)}
+                          disabled={
+                            isUploading ||
+                            (uploadingFormat?.clientId === client.id &&
+                              uploadingFormat?.format === format)
+                          }
+                          className="flex items-center gap-2 px-3 py-1 text-sm text-white transition-colors bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {uploadingFormat?.clientId === client.id &&
+                          uploadingFormat?.format === format ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Uploading...
+                            </>
+                          ) : (
+                            <>Upload Image</>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )
                 )}
@@ -548,6 +615,32 @@ export default function ClientPage() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de prévisualisation */}
+        {previewImage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="relative max-w-4xl p-4 bg-white rounded-lg">
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute p-2 text-gray-500 hover:text-gray-700 top-2 right-2"
+              >
+                ✕
+              </button>
+              <h3 className="mb-4 text-lg font-semibold">
+                Format: {previewImage.format}
+              </h3>
+              <img
+                src={previewImage.url}
+                alt={`Format ${previewImage.format}`}
+                className="max-h-[80vh] w-auto"
+                onError={() => {
+                  setPreviewImage(null);
+                  toast.error("Failed to load image");
+                }}
+              />
             </div>
           </div>
         )}
