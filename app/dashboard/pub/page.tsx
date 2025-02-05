@@ -177,18 +177,8 @@ export default function PubPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      if (!imageData.selectedFile) {
-        toast.error("Please select an image first");
-        return;
-      }
-
-      if (!imageData.company_name) {
-        toast.error("Please enter a company name");
-        return;
-      }
-
-      if (!selectedWeek) {
-        toast.error("Please select a week");
+      if (!imageData.selectedFile || !selectedWeek) {
+        toast.error("Please select an image and week");
         return;
       }
 
@@ -196,22 +186,9 @@ export default function PubPage() {
       setProgress(0);
 
       const formData = new FormData();
-      const fileExtension = imageData.selectedFile.name.split(".").pop();
-      const customFileName = `week-${selectedWeek}-${imageData.position}-${imageData.company_name}.${fileExtension}`;
-
-      // Créer un nouveau fichier avec le nom personnalisé
-      const renamedFile = new File([imageData.selectedFile], customFileName, {
-        type: imageData.selectedFile.type,
-      });
-
-      formData.append("file", renamedFile);
-      formData.append("country", "ALL");
+      formData.append("file", imageData.selectedFile);
       formData.append("weekNumber", selectedWeek.toString());
-
-      // Simuler la progression
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => (prev >= 90 ? prev : prev + 5));
-      }, 200);
+      formData.append("position", imageData.position);
 
       const uploadResponse = await fetch("/api/upload", {
         method: "POST",
@@ -219,49 +196,37 @@ export default function PubPage() {
       });
 
       if (!uploadResponse.ok) {
-        const error = await uploadResponse.json();
-        throw new Error(error.error || "Upload failed");
+        throw new Error("Upload failed");
       }
 
       const { publicUrl } = await uploadResponse.json();
 
       // Sauvegarder dans Firestore
-      const customDocId = `week-${selectedWeek}-${imageData.position}-${imageData.company_name}`;
       const saveResponse = await fetch("/api/game-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customDocId,
+          customDocId: `week-${selectedWeek}-${imageData.position}-ALL`,
           imageData: {
             ...imageData,
             weekNumber: selectedWeek,
             imageUrl: publicUrl,
             publicUrl,
+            country: "ALL",
             createdAt: new Date().toISOString(),
           },
         }),
       });
 
       if (!saveResponse.ok) {
-        const errorData = await saveResponse.json();
-        throw new Error(errorData.error || "Failed to save image data");
+        throw new Error("Failed to save image data");
       }
-
-      clearInterval(progressInterval);
-      setProgress(100);
 
       toast.success("Image uploaded successfully");
       setIsUploadModalOpen(false);
-      setImageData((prev) => ({
-        ...prev,
-        selectedFile: undefined,
-        company_name: "",
-      }));
     } catch (error) {
-      console.error("Error during upload:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload image"
-      );
+      console.error("Error:", error);
+      toast.error("Failed to upload image");
     } finally {
       setIsUploading(false);
       setProgress(0);
@@ -491,7 +456,7 @@ export default function PubPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100">
+    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-100 mt-0">
       <div className="max-w-4xl p-4 mx-auto md:p-8">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-foreground">Pub Management</h1>
@@ -519,7 +484,7 @@ export default function PubPage() {
           </div>
         </div>
 
-        <div className="space-y-6">
+        <div className="">
           {/* Calendrier */}
           <div className="overflow-hidden border shadow-sm bg-card rounded-xl">
             <div className="p-6">

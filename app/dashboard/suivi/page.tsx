@@ -2,7 +2,7 @@
 
 import { auth } from "@/app/firebase/config";
 import "@/app/globals.css";
-import { Loader2, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import Calendar from "react-calendar";
@@ -18,6 +18,7 @@ export default function SuiviPage() {
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [deletingImageId, setDeletingImageId] = useState<string | null>(null);
   const [deleteProgress, setDeleteProgress] = useState(0);
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
 
   // Réutiliser les fonctions nécessaires de PubPage
   const getWeekNumber = (date: Date): number => {
@@ -82,6 +83,23 @@ export default function SuiviPage() {
 
     return matchesQuery && matchesCountry;
   });
+
+  // Fonction pour grouper les images par client
+  const groupImagesByClient = (images: ImageData[]) => {
+    return images.reduce((acc, image) => {
+      const clientKey = image.company_name;
+      if (!acc[clientKey]) {
+        acc[clientKey] = {
+          offers: new Set(),
+          images: [],
+          isPartner: !image.company_name.includes("-"), // Vérifie si c'est une offre partenaire (ajoutée manuellement)
+        };
+      }
+      acc[clientKey].offers.add(image.offerType);
+      acc[clientKey].images.push(image);
+      return acc;
+    }, {} as Record<string, { offers: Set<string>; images: ImageData[]; isPartner: boolean }>);
+  };
 
   const handleDelete = async (image: ImageData) => {
     try {
@@ -280,77 +298,102 @@ export default function SuiviPage() {
               </div>
 
               <div className="flex-1 space-y-4 overflow-y-auto">
-                {filteredImages.map((image, index) => (
-                  <div
-                    key={index}
-                    className="p-4 transition-colors border rounded-lg hover:bg-accent"
-                  >
-                    <div className="flex items-start justify-between w-full gap-4">
-                      <div className="flex flex-col flex-1">
-                        <div className="flex flex-col items-start space-y-2">
-                          <p className="text-lg font-bold text-card-foreground">
-                            {image.company_name}
-                          </p>
-                          <div className="flex flex-col items-start space-y-1">
-                            <p className="text-sm font-medium text-card-foreground">
-                              Offer Type: {image.offerType}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Position: {image.position}
-                            </p>
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-muted-foreground">
-                                Format: {image.format}
-                              </p>
-                            </div>
-                            <p className="text-sm text-muted-foreground">
-                              Week {image.weekNumber}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Country: {image.country}
-                            </p>
+                {Object.entries(groupImagesByClient(filteredImages)).map(
+                  ([clientName, data]) => (
+                    <div
+                      key={clientName}
+                      className="overflow-hidden border rounded-lg hover:border-primary/50"
+                    >
+                      <button
+                        onClick={() =>
+                          setExpandedClient(
+                            expandedClient === clientName ? null : clientName
+                          )
+                        }
+                        className="flex items-center justify-between w-full p-4 text-left transition-colors hover:bg-accent/50"
+                      >
+                        <div className="flex items-center space-x-4">
+                          <h3 className="text-lg font-semibold">
+                            {clientName}
+                          </h3>
+                          <div className="text-sm text-muted-foreground">
+                            Offers: {Array.from(data.offers).join(", ")}
                           </div>
                         </div>
-                      </div>
+                        {expandedClient === clientName ? (
+                          <ChevronUp className="w-5 h-5" />
+                        ) : (
+                          <ChevronDown className="w-5 h-5" />
+                        )}
+                      </button>
 
-                      <div
-                        className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg cursor-pointer"
-                        onClick={() => handleImageClick(image)}
-                      >
-                        <Image
-                          src={image.publicUrl || image.imageUrl}
-                          alt={`${image.company_name} - ${image.position}`}
-                          width={120}
-                          height={120}
-                          className="object-cover w-full h-full transition-opacity hover:opacity-80"
-                        />
-                      </div>
+                      {expandedClient === clientName && (
+                        <div className="p-4 space-y-4 border-t">
+                          {data.images.map((image, index) => (
+                            <div
+                              key={index}
+                              className="p-4 transition-colors border rounded-lg hover:bg-accent/50"
+                            >
+                              <div className="flex items-start justify-between w-full gap-4">
+                                <div className="flex flex-col flex-1">
+                                  <div className="flex flex-col items-start space-y-2">
+                                    <p className="text-sm font-medium text-card-foreground">
+                                      Offer Type: {image.offerType}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Position: {image.position}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Format: {image.format}
+                                    </p>
+                                  </div>
+                                </div>
 
-                      <div className="flex items-start">
-                        <button
-                          onClick={() => handleDelete(image)}
-                          disabled={deletingImageId !== null}
-                          className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                        >
-                          {deletingImageId ===
-                          `week-${image.weekNumber}-${image.position}-${image.country}` ? (
-                            <div className="flex flex-col items-center">
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                              <div className="w-10 h-1 mt-1 overflow-hidden bg-gray-200 rounded-full">
                                 <div
-                                  className="h-full transition-all duration-300 bg-red-600"
-                                  style={{ width: `${deleteProgress}%` }}
-                                />
+                                  className="min-w-[120px] w-[120px] h-[120px] overflow-hidden rounded-lg cursor-pointer"
+                                  onClick={() => handleImageClick(image)}
+                                >
+                                  <Image
+                                    src={image.publicUrl || image.imageUrl}
+                                    alt={`${image.company_name} - ${image.position}`}
+                                    width={120}
+                                    height={120}
+                                    className="object-cover w-full h-full transition-opacity hover:opacity-80"
+                                  />
+                                </div>
+
+                                <div className="flex items-start">
+                                  <button
+                                    onClick={() => handleDelete(image)}
+                                    disabled={deletingImageId !== null}
+                                    className="p-2 text-sm font-medium transition-colors rounded-md text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                                  >
+                                    {deletingImageId ===
+                                    `week-${image.weekNumber}-${image.position}-${image.country}` ? (
+                                      <div className="flex flex-col items-center">
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                        <div className="w-10 h-1 mt-1 overflow-hidden bg-gray-200 rounded-full">
+                                          <div
+                                            className="h-full transition-all duration-300 bg-red-600"
+                                            style={{
+                                              width: `${deleteProgress}%`,
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <Trash2 className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          ) : (
-                            <Trash2 className="w-5 h-5" />
-                          )}
-                        </button>
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                )}
 
                 {filteredImages.length === 0 && selectedWeek && (
                   <p className="py-4 text-center text-muted-foreground">
